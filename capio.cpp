@@ -328,11 +328,12 @@ main(int argc, char *argv[]) {
                             case SYS_read:
                             case SYS_write:
                             {
-                                debug(1, "write or read: %d", op);
                                 int fd = regs.rdi;
+                                size_t len = rc;
+
+                                debug(1, "write or read: %d, fd: %d, len: %d\n", op, fd, len);
                                 if (p.dumping && (!fds || (*fds)[fd])) {
                                     long long mem = regs.rsi;
-                                    size_t len = rc;
                                     debug(5, "dumping %d bytes for fd %d", len, fd);
                                     const unsigned char *data = read_proc_mem(pid, mem, len);
                                     dump(*out, format, pid, fd, len, op, data);
@@ -342,6 +343,11 @@ main(int argc, char *argv[]) {
                                 }
                                 break;
                             }
+                            case SYS_sendto:
+                            case SYS_recvfrom:
+                            case SYS_sendmsg:
+                            case SYS_recvmsg:
+                                debug(1, "unsupported I/O call %d!", op);
                             case SYS_clone:
                                 debug(1, "clone!");
                                 break;
@@ -350,6 +356,7 @@ main(int argc, char *argv[]) {
                                 reset_process_name(p);
                                 break;
                             default:
+                                debug(1, "syscall %d!", op);
                                 break;
                             }
                         }
