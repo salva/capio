@@ -380,13 +380,23 @@ main(int argc, char *argv[]) {
                                     }
                                     else
                                         *out << "NULL";
-                                    *out << ", ..., control:";
+                                    *out << ", iovlen: " << msg.msg_iovlen << ", control:";
                                     if (msg.msg_control) {
                                         *out << read_proc_string_quoted(pid, (long long)msg.msg_control, msg.msg_controllen);
                                     }
                                     else
                                         *out << "NULL";
                                     *out << ") = " << rc << endl << flush;
+                                    if (rc) {
+                                        size_t len = rc;
+                                        for (size_t i = 0; len && i < msg.msg_iovlen; i++) {
+                                            struct iovec iov;
+                                            read_proc_struct(pid, (long long)(msg.msg_iov + i), sizeof(iov), &iov);
+                                            size_t chunk = ((len > iov.iov_len) ? iov.iov_len : len);
+                                            dump(*out, format, false, read_proc_mem(pid, (long long)iov.iov_base, chunk), chunk);
+                                            len -= chunk;
+                                        }
+                                    }
                                 }
                                 break;
                             case SYS_clone:
