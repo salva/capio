@@ -1,0 +1,33 @@
+=head1 NAME
+
+capio - trace and capture process I/O
+
+=head1 SYNOPSIS
+
+    capio [-f] [-lfd]... [-ppid]... [-mformat] [-ofile] [-npattern] [-- command [args]]
+
+=head1 DESCRIPTION
+
+In the simplest case B<capio> runs the specific command until it exits. It monitors I/O syscalls and dumps the data
+being passed.
+
+
+=head1 OPTIONS
+
+=over 4
+
+=item -f
+
+Follow child processes as they are created by currently traced processes as a result of the L<fork(2)>, vfork(2) and
+clone(2) system calls and capture their output too.
+
+=item -l I<fd>
+
+Dump data passing through the given file descriptor only. This flag can be given several times.
+
+=item -p I<pid>
+
+Attach to the process the with PID I<pid> and begin tracing.
+
+
+=back
