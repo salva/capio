@@ -27,7 +27,67 @@ Dump data passing through the given file descriptor only. This flag can be given
 
 =item -p I<pid>
 
-Attach to the process the with PID I<pid> and begin tracing.
+Attach to the process with PID I<pid> and begin tracing.  The trace may be terminated at any time by a keyboard
+interrupt signal (CTRL-C). B<capio> will respond by detaching itself from the traced process(es) leaving it (them) to
+continue running.  Multiple B<-p> options can be used to attach to many processes in addition to command (which is
+optional if at least one B<-p> option is given).
 
+=item -m I<format>
+
+Pick the output format for the captured data. The available formats are as follows:
+
+=over 4
+
+=item x
+
+hexdump - dump the data in hexedecimal.
+
+=item q
+
+quote - dump the data as C strings with control and non printable charaters escaped.
+
+=item n
+
+quote with new lines - as quote mode but break the output at LF characters.
+
+=item r
+
+raw - dump the data without any processing
 
 =back
+
+=item -o I<file>
+
+Write the captured data to the given file rather than to stdout.
+
+=item -n I<pattern>
+
+Captures the data only when the name of the process matches the given file name pattern.
+
+=back
+
+=head1 EXAMPLES
+
+B<capio> was initially written for examining how L<cupsd(8)> interacted with its backends. The following command shows
+the dialogs with B<tea4cups> slave processes:
+
+    capio -p `pidof cupsd` -f -n `*/tea4cups' -l0 -l1
+
+=head1 BUGS AND SUPPORT
+
+B<capio> is still a young program, it may contain lots of bugs and miss features some people may find essential. Don't
+hesitate to report them (or to contribute patches) using the bug tracker at L<https://github.com/salva/capio>.
+
+=head1 COPYING
+
+Copyright (c) 2017 Salvador FandiE<ntilde>o (sfandino@yahoo.com).
+
+B<capio> is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see
+<http://www.gnu.org/licenses/>.
+
