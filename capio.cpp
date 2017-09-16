@@ -6,6 +6,8 @@
 #include <ctype.h>
 #include <syscall.h>
 #include <fnmatch.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <sys/user.h>
@@ -53,8 +55,8 @@ fatal(const char *msg) {
 }
 
 #define LINELEN 32
-static void dump_hex(ostream &out, pid_t pid, int fd, size_t len, int op, const unsigned char *data) {
-    int dir = (op == 1 ? '>' : '<');
+static void dump_hex(ostream &out, bool writting, const unsigned char *data, size_t len) {
+    int dir = (writting ? '>' : '<');
     int lines = (len + LINELEN - 1) / LINELEN;
     if (lines == 0) lines = 1;
     for (int i = 0; i < lines; i++) {
@@ -72,92 +74,87 @@ static void dump_hex(ostream &out, pid_t pid, int fd, size_t len, int op, const 
         out << " "; out.put(dir); out << " ";
         for (int j = 0; j < LINELEN; j++) {
             int off = i * LINELEN + j;
-            if (off < len)
-                out.put(isprint(data[off]) ? data[off] : '.');
-            else
-                out << ' ';
+            if (off >= len) break;
+            out.put(isprint(data[off]) ? data[off] : '.');
         }
-
-        out << " ";
-        out.put(dir);
-        if (i == 0)
-            out << " pid: " << pid << ", fd: " << fd << ", len: " << len;
         out << endl << flush;
     }
 }
 
 static void
-dump_quoted(ostream &out, pid_t pid, int fd, size_t len, int op, const unsigned char *data, bool breaks) {
-    out.put(op == 1 ? '>' : '<');
-    out << " pid: " << pid << ", fd: " << fd << ", len: " << len << endl;
-    if (len) {
-        out.put('"');
-        for (int i = 0; i < len; i++) {
-            int c = data[i];
-            switch(c) {
-            case '\0':
-            case '\a':
-                out << "\\a";
-                break;
-            case '\b':
-                out << "\\b";
-                break;
-            case '\t':
-                out << "\\t";
-                break;
-            case '\n':
-                out << "\\n";
-                if (breaks && (len - i > 1))
-                    out << "\"" << endl << "\"";
-                break;
-            case '\v':
-                out << "\\v";
-                break;
-            case '\f':
-                out << "\\f";
-                break;
-            case '\r':
-                out << "\\r";
-                break;
-            case '\\':
-                out << "\\\\";
-                break;
-            default:
-                if (isprint(c)) {
-                    out.put(c);
-                }
-                else {
-                    char hex[10];
-                    sprintf(hex, "\\x%02x", c);
-                    out << hex;
-                }
+put_quoted(ostream &out, const unsigned char *data, size_t len, bool breaks = false, string prefix = "") {
+    out << prefix << "\"";
+    for (size_t i = 0; i < len; i++) {
+        int c = data[i];
+        switch(c) {
+        case '\0':
+        case '\a':
+            out << "\\a";
+            break;
+        case '\b':
+            out << "\\b";
+            break;
+        case '\t':
+            out << "\\t";
+            break;
+        case '\n':
+            out << "\\n";
+            if (breaks && (len - i > 1))
+                out << "\"" << endl << prefix << "\"";
+            break;
+        case '\v':
+            out << "\\v";
+            break;
+        case '\f':
+            out << "\\f";
+            break;
+        case '\r':
+            out << "\\r";
+            break;
+        case '\\':
+            out << "\\\\";
+            break;
+        default:
+            if (isprint(c)) {
+                out.put(c);
+            }
+            else {
+                char hex[10];
+                sprintf(hex, "\\x%02x", c);
+                out << hex;
             }
         }
+    }
+    out << "\"";
+}
 
-        out.put('"');
+static void
+dump_quoted(ostream &out, bool writting, const unsigned char *data, size_t len, bool breaks) {
+    if (len) {
+        put_quoted(out, data, len, breaks, (writting ? "> " : "< "));
         out << endl << flush;
     }
 }
 
 static void
-dump_raw(ostream &out, size_t len, const unsigned char *data) {
+dump_raw(ostream &out, const unsigned char *data, size_t len) {
     out.write(reinterpret_cast<const char *>(data), len);
     out << flush;
 }
 
-static void dump(ostream &out, int format, pid_t pid, int fd, size_t len, int op, const unsigned char *data) {
+static void dump(ostream &out, int format, bool writting, const unsigned char *data, size_t len) {
     switch (format) {
     case 'x':
-        dump_hex(out, pid, fd, len, op, data);
+        dump_hex(out, writting, data, len);
         break;
     case 'q':
-        dump_quoted(out, pid, fd, len, op, data, false);
+        dump_quoted(out, writting, data, len, false);
         break;
     case 'n':
-        dump_quoted(out, pid, fd, len, op, data, true);
+        dump_quoted(out, writting, data, len, true);
         break;
     case 'r':
-        dump_raw(out, len, data);
+        dump_raw(out, data, len);
         break;
     default:
         debug(1, "Format %c not implemented yet", format);
@@ -197,6 +194,20 @@ read_proc_mem(pid_t pid, long long mem, size_t len) {
     return (const unsigned char*)"";
 }
 
+static string
+read_proc_string_quoted(pid_t pid, long long mem, size_t len) {
+    stringstream ss;
+    const unsigned char *data = read_proc_mem(pid, mem, len);
+    put_quoted(ss, data, len);
+    return ss.str();
+}
+
+static void
+read_proc_struct(pid_t pid, long long mem, size_t len, void *to) {
+    const unsigned char *data = read_proc_mem(pid, mem, len);
+    memcpy(to, data, len);
+}
+
 static string *
 process_name(pid_t pid) {
     string path = "/proc/" + to_string(pid) + "/exe";
@@ -216,6 +227,7 @@ static string *name_pattern = NULL;
 static bool dump_children = false;
 static char format = 'x';
 static ostream *out;
+static bool quiet;
 
 static void
 reset_process_name(Process &p) {
@@ -235,7 +247,7 @@ main(int argc, char *argv[]) {
     int fd;
     pid_t pid;
     out = &cout;
-    while ((opt = getopt(argc, argv, "o:m:p:n:l:fd")) != -1) {
+    while ((opt = getopt(argc, argv, "o:m:p:n:l:fdq")) != -1) {
         switch (opt) {
         case 'p':
             pid = atol(optarg);
@@ -267,6 +279,9 @@ main(int argc, char *argv[]) {
             break;
         case 'o':
             out = new ofstream(optarg);
+            break;
+        case 'q':
+            quiet = true;
             break;
         default:
             fprintf(stderr, "Usage: %s -p PID [-p PID1 [...]]\n", argv[0]);
@@ -323,41 +338,87 @@ main(int argc, char *argv[]) {
 
                         long long rc = regs.rax;
                         if (rc >= 0) {
+                            bool writting = false;
+                            long long mem = 0;
+                            size_t len;
+                            int fd = regs.rdi;
                             long long op = regs.orig_rax;
+                            bool dumping = p.dumping;
                             switch(op) {
-                            case SYS_read:
                             case SYS_write:
-                            {
-                                int fd = regs.rdi;
-                                size_t len = rc;
-
-                                debug(1, "write or read: %d, fd: %d, len: %d\n", op, fd, len);
-                                if (p.dumping && (!fds || (*fds)[fd])) {
-                                    long long mem = regs.rsi;
-                                    debug(5, "dumping %d bytes for fd %d", len, fd);
-                                    const unsigned char *data = read_proc_mem(pid, mem, len);
-                                    dump(*out, format, pid, fd, len, op, data);
-                                }
-                                else {
-                                    debug(4, "skipping process %d\n", pid);
+                                writting = true;
+                            case SYS_read:
+                                if (dumping && (!fds || (*fds)[fd])) {
+                                    mem = regs.rsi;
+                                    len = rc;
+                                    if (!quiet)
+                                        *out << "#" << pid << " " << (writting ? "write" : "read") << "(fd: " << fd << ") = " << rc << endl << flush;
                                 }
                                 break;
-                            }
                             case SYS_sendto:
+                                // sys_sendto	int fd	void *buff	size_t len	unsigned flags	struct sockaddr *addr	int addr_len
+                                if (dumping && (!fds || (*fds)[fd])) {
+                                    mem = regs.rsi;
+                                    len = rc;
+                                    if (!quiet)
+                                        *out << "#" << pid << "sendto(fd:" << fd << ", ...) = " << rc << endl << flush;
+                                }
+                                break;
                             case SYS_recvfrom:
                             case SYS_sendmsg:
+                                if (!quiet && dumping && (!fds || (*fds)[fd]))
+                                    *out << "#" << pid << " __ unsupported system call__(" << op << ") = " << rc << endl << flush;
+                                break;
                             case SYS_recvmsg:
-                                debug(1, "unsupported I/O call %d!", op);
+                                // sys_recvmsg	int fd	struct msghdr *msg	unsigned int flags
+                                if (dumping && (!fds || (*fds)[fd])) {
+                                    struct msghdr msg;
+                                    read_proc_struct(pid, regs.rsi, sizeof(msg), (void*)&msg);
+                                    *out << "#" << pid << " recvmsg(fd:" << fd << ", name: ";
+                                    if (msg.msg_name) {
+                                        *out << read_proc_string_quoted(pid, (long long)msg.msg_name, msg.msg_namelen);
+                                    }
+                                    else
+                                        *out << "NULL";
+                                    *out << ", ..., control:";
+                                    if (msg.msg_control) {
+                                        *out << read_proc_string_quoted(pid, (long long)msg.msg_control, msg.msg_controllen);
+                                    }
+                                    else
+                                        *out << "NULL";
+                                    *out << ") = " << rc << endl << flush;
+                                }
+                                break;
                             case SYS_clone:
-                                debug(1, "clone!");
+                                if (!quiet && dumping)
+                                    *out << "#" << pid << " clone() = " << rc << endl << flush;
                                 break;
                             case SYS_execve:
-                                debug(1, "exec!");
                                 reset_process_name(p);
+                                if (!quiet && (dumping || p.dumping))
+                                    *out << "#" << pid << " execve(" << (p.process_name ? p.process_name->c_str() : "*unknown*")
+                                         << ") = " << rc << endl << flush;
+                                break;
+                            case SYS_dup:
+                                if (!quiet && dumping && (!fds || (*fds)[fd] || (*fds)[rc]))
+                                    *out << "#" << pid << " dup(fd: " << fd << ") = " << rc << endl << flush;
+                                break;
+                            case SYS_dup2:
+                                if (!quiet && dumping && (!fds || (*fds)[fd] || (*fds)[rc]))
+                                    *out << "#" << pid << " dup2(oldfd:" << fd << ", newfd:" << regs.rsi << ") = " << rc << endl << flush;
+                                break;
+                            case SYS_dup3:
+                                if (!quiet && dumping && (!fds || (*fds)[fd] || (*fds)[rc]))
+                                    *out << "#" << pid << " dup3(oldfd:" << fd << ", newfd:" << regs.rsi << ", flags:"
+                                         << regs.rdx << ") = " << rc << endl << flush;
                                 break;
                             default:
                                 debug(1, "syscall %d!", op);
                                 break;
+                            }
+
+                            if (mem) {
+                                dump(*out, format, writting, read_proc_mem(pid, mem, rc), len);
                             }
                         }
                     }
