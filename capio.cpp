@@ -25,6 +25,7 @@ static bool dump_children = false;
 static char format = 'x';
 static ostream *out;
 static bool quiet;
+static bool dont_follow = false;
 
 static void
 debug(int level, const char *fmt...) {
@@ -151,7 +152,7 @@ Process::close_fd(int fd) {
 
 void
 Process::dup_fd(int oldfd, int newfd) {
-    if (oldfd != newfd) {
+    if (oldfd != newfd && !dont_follow) {
         close_fd(newfd);
         FDGroup *grp = fdgroup(oldfd);
         grp->add_fd(newfd);
@@ -493,7 +494,7 @@ main(int argc, char *argv[]) {
     int fd;
     pid_t pid;
     out = &cout;
-    while ((opt = getopt(argc, argv, "o:m:p:n:N:l:fdq")) != -1) {
+    while ((opt = getopt(argc, argv, "o:m:p:n:N:l:fdqF")) != -1) {
         switch (opt) {
         case 'p':
             pid = atol(optarg);
@@ -509,6 +510,9 @@ main(int argc, char *argv[]) {
             break;
         case 'f':
             dump_children = true;
+            break;
+        case 'F':
+            dont_follow = true;
             break;
         case 'd':
             debug_level++;

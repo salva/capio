@@ -4,12 +4,12 @@ capio - trace and capture process I/O
 
 =head1 SYNOPSIS
 
-    capio [-f] [-q] [-lfd]... [-ppid]... [-mformat] [-ofile] [-nexe_pattern]... -N[fn_pattern]... [-- command [args]]
+    capio [-f] [-q] [-F] [-lfd]... [-ppid]... [-mformat] [-ofile] [-nexe_pattern]... -N[fn_pattern]... [-- command [args]]
 
 =head1 DESCRIPTION
 
-In the simplest case B<capio> runs the specific command until it exits. It monitors I/O syscalls and dumps the data
-being passed.
+In the simplest case B<capio> runs the specific command until it
+exits. It monitors I/O syscalls and dumps the data being passed.
 
 
 =head1 OPTIONS
@@ -18,23 +18,41 @@ being passed.
 
 =item -f
 
-Follow child processes as they are created by currently traced processes as a result of the L<fork(2)>, vfork(2) and
-clone(2) system calls and capture their output too.
+Follow child processes as they are created by currently traced
+processes as a result of the L<fork(2)>, vfork(2) and clone(2) system
+calls and capture their output too.
+
+=item -F
+
+Don't follow file descriptor duplications.
+
+When the user picks a specific set of file descriptors for capturing,
+by default, B<capio> takes into account operations duplicating file
+descriptors and dumps the information related to both the picked file
+descriptors and their duplicates.
+
+This flag, disables that feature restricting the operations being
+monitored to those involving the file descriptors picked by the user
+strictly.
 
 =item -l I<fd>
 
-Dump data passing through the given file descriptor only. This flag can be given several times.
+Dump data passing through the given file descriptor only. This flag
+can be given several times.
 
 =item -p I<pid>
 
-Attach to the process with PID I<pid> and begin tracing.  The trace may be terminated at any time by a keyboard
-interrupt signal (CTRL-C). B<capio> will respond by detaching itself from the traced process(es) leaving it (them) to
-continue running.  Multiple B<-p> options can be used to attach to many processes in addition to command (which is
-optional if at least one B<-p> option is given).
+Attach to the process with PID I<pid> and begin tracing.  The trace
+may be terminated at any time by a keyboard interrupt signal
+(CTRL-C). B<capio> will respond by detaching itself from the traced
+process(es) leaving it (them) to continue running.  Multiple B<-p>
+options can be used to attach to many processes in addition to command
+(which is optional if at least one B<-p> option is given).
 
 =item -m I<format>
 
-Pick the output format for the captured data. The available formats are as follows:
+Pick the output format for the captured data. The available formats
+are as follows:
 
 =over 4
 
@@ -44,11 +62,13 @@ hexdump - dump the data in hexedecimal.
 
 =item q
 
-quote - dump the data as C strings with control and non printable charaters escaped.
+quote - dump the data as C strings with control and non printable
+charaters escaped.
 
 =item n
 
-quote with new lines - as quote mode but break the output at LF characters.
+quote with new lines - as quote mode but break the output at LF
+characters.
 
 =item r
 
@@ -86,26 +106,33 @@ Dumps only the captured data, suppresing any syscall information.
 
 =head1 EXAMPLES
 
-B<capio> was initially written for examining how L<cupsd(8)> interacted with its backends. The following command shows
-the dialogs with B<tea4cups> slave processes:
+B<capio> was initially written for examining how L<cupsd(8)>
+interacted with its backends. The following command shows the dialogs
+with B<tea4cups> slave processes:
 
-    capio -p `pidof cupsd` -f -n `*/tea4cups' -l0 -l1
+    capio -p `pidof cupsd` -f -n `*/tea4cups' -N "socket:*"
 
 =head1 BUGS AND SUPPORT
 
-B<capio> is still a young program, it may contain lots of bugs and miss features some people may find essential. Don't
-hesitate to report them (or to contribute patches) using the bug tracker at L<https://github.com/salva/capio>.
+B<capio> is still a young program, it may contain lots of bugs and
+miss features some people may find essential. Don't hesitate to report
+them (or to contribute patches) using the bug tracker at
+L<https://github.com/salva/capio>.
 
 =head1 COPYING
 
 Copyright (c) 2017 Salvador FandiE<ntilde>o (sfandino@yahoo.com).
 
-B<capio> is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as
-published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+B<capio> is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with this program. If not, see
-<http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
 
