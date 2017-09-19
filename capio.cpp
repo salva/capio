@@ -17,15 +17,23 @@
 
 using namespace std;
 
+#include "capio.h"
+
 static int debug_level = 0;
 static unordered_map<int, bool> dumping_fds;
 static forward_list<string> exe_patterns;
 static forward_list<string> fn_patterns;
 static bool dump_children = false;
-static char format = 'x';
+static char format = '\0';
 static ostream *out;
 static bool quiet;
 static bool dont_follow = false;
+
+#ifdef CAPIO_PERL
+static string perl_code;
+static char perl_flag = '\0';
+#include "capio_perl.h"
+#endif
 
 static void
 debug(int level, const char *fmt...) {
@@ -72,51 +80,14 @@ get_process_filename(pid_t pid, int fd) {
     return proc_readlink(pid, "fd/" + to_string(fd));
 }
 
-struct FDGroup {
-    std::forward_list<int> fds;
-    bool dumping;
-    string path;
-    FDGroup(int fd, string path_) : path(path_) {
-        fds.push_front(fd);
-        debug(4, "checking dumping for fd %d, empty: %d, dumping_fd[%d] = %d",
-              fd, dumping_fds.empty(), fd, dumping_fds.count(fd));
-        dumping = ((dumping_fds.empty() || dumping_fds.count(fd)) &&
-                   match_fn_patterns(fn_patterns, path_));
-    }
-
-    void add_fd(int fd);
-    void rm_fd(int fd);
-    bool empty();
-};
-
-struct Process {
-    pid_t pid;
-    bool initialized;
-    bool dumping;
-    bool sigcall_exiting;
-    string process_name;
-    string enter_args;
-    struct user_regs_struct enter_regs;
-
-    FDGroup *fdgroup(int fd);
-    Process(pid_t pid)
-        : pid(pid), dumping(true),
-          sigcall_exiting(false), initialized(false) {
-        reset_process_name();
-        debug(4, "New process structure with pid %d", pid);
-    }
-    ~Process() { }
-
-    void dup_fd(int oldfd, int newfd);
-    void close_fd(int fd);
-    bool dumping_fd(int fd);
-    void reset_process_name();
-    string fd_path(int fd);
-private:
-    unordered_map<int,FDGroup*> fdgroups;
-};
-
 static unordered_map<pid_t, Process*> processes;
+
+Process::Process(pid_t pid)
+    : pid(pid), dumping(true),
+      sigcall_exiting(false), initialized(false) {
+    reset_process_name();
+    debug(4, "New process structure with pid %d", pid);
+}
 
 void
 Process::reset_process_name() {
@@ -125,9 +96,17 @@ Process::reset_process_name() {
     debug(2, "process name for pid %d is %s, dumping is %d\n", pid, process_name.c_str(), (int)dumping);
 }
 
-string
+const string&
 Process::fd_path(int fd) {
     return fdgroup(fd)->path;
+}
+
+FDGroup::FDGroup(int fd, string path_) : path(path_) {
+    fds.push_front(fd);
+    debug(4, "checking dumping for fd %d, empty: %d, dumping_fd[%d] = %d",
+          fd, dumping_fds.empty(), fd, dumping_fds.count(fd));
+    dumping = ((dumping_fds.empty() || dumping_fds.count(fd)) &&
+               match_fn_patterns(fn_patterns, path_));
 }
 
 FDGroup *
@@ -324,7 +303,8 @@ read_proc_mem(pid_t pid, long long mem, size_t len) {
     return (const unsigned char*)"";
 }
 
-static void dump_mem(ostream &out, int format, bool writting, pid_t pid, long long mem, size_t len) {
+static void
+dump_mem(ostream &out, int format, bool writting, pid_t pid, long long mem, size_t len) {
     const unsigned char *data = read_proc_mem(pid, mem, len);
     switch (format) {
     case 'x':
@@ -338,6 +318,8 @@ static void dump_mem(ostream &out, int format, bool writting, pid_t pid, long lo
         break;
     case 'r':
         dump_raw(out, data, len);
+        break;
+    case '0':
         break;
     default:
         debug(1, "Format %c not implemented yet", format);
@@ -489,12 +471,15 @@ dump_syscall(ostream &out, pid_t pid, const char *name, long long rc, const char
 }
 
 int
-main(int argc, char *argv[]) {
+main(int argc, char *argv[], char *env[]) {
+#ifdef CAPIO_PERL
+    init_perl(argc, argv, env);
+#endif
     int opt;
     int fd;
     pid_t pid;
     out = &cout;
-    while ((opt = getopt(argc, argv, "o:m:p:n:N:l:fdqF")) != -1) {
+    while ((opt = getopt(argc, argv, "o:m:p:n:N:l:e:E:fdqF")) != -1) {
         switch (opt) {
         case 'p':
             pid = atol(optarg);
@@ -522,7 +507,7 @@ main(int argc, char *argv[]) {
             dumping_fds[fd] = true;
             break;
         case 'm':
-            if (strchr("xqrn", optarg[0]) && optarg[1] == '\0') {
+            if (strchr("xqrn0", optarg[0]) && optarg[1] == '\0') {
                 format = optarg[0];
             }
             else
@@ -534,11 +519,30 @@ main(int argc, char *argv[]) {
         case 'q':
             quiet = true;
             break;
+#ifdef CAPIO_PERL
+        case 'e':
+        case 'E':
+            if (perl_flag)
+                fatal("e and E flags are exclusive");
+            perl_flag = opt;
+            perl_code = optarg;
+            if (!format)
+                format = '0';
+            break;
+#endif
         default:
             fprintf(stderr, "Usage: %s -p PID [-p PID1 [...]]\n", argv[0]);
             exit(EXIT_FAILURE);
         }
     }
+
+#ifdef CAPIO_PERL
+    if (perl_flag)
+        parse_perl(perl_code);
+#endif
+
+    if (!format)
+        format = 'x';
 
     if (argc > optind) {
         pid_t pid = fork();
@@ -598,6 +602,8 @@ main(int argc, char *argv[]) {
                                                  (writting ? "write" : "read"),
                                                  RC, "fd:%lld", ARG0);
                                     dump_mem(*out, format, writting, pid, ARG1, RC);
+                                    if (perl_flag)
+                                        dump_perl(p, ARG0, (writting ? "write" : "read"), RC, writting, ARG1, RC);
                                 }
                                 break;
                             case SYS_sendto:

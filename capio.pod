@@ -74,6 +74,10 @@ characters.
 
 raw - dump the data without any processing
 
+=item 0
+
+nothing - dump nothing
+
 =back
 
 =item -o I<file>
