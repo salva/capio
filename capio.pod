@@ -4,7 +4,7 @@ capio - trace and capture process I/O
 
 =head1 SYNOPSIS
 
-    capio [-f] [-lfd]... [-ppid]... [-mformat] [-ofile] [-npattern] [-- command [args]]
+    capio [-f] [-q] [-lfd]... [-ppid]... [-mformat] [-ofile] [-nexe_pattern]... -N[fn_pattern]... [-- command [args]]
 
 =head1 DESCRIPTION
 
@@ -60,9 +60,27 @@ raw - dump the data without any processing
 
 Write the captured data to the given file rather than to stdout.
 
-=item -n I<pattern>
+=item -n I<exe_pattern>
 
-Captures the data only when the name of the process matches the given file name pattern.
+Captures the data only when the name of the process matches the given
+file name pattern. This flag can be passed multiple times.
+
+=item -N I<fn_pattern>
+
+Captures the data only when the name of the file attached to the file
+descriptor matches the given pattern. This flag can be passed
+multiple times.
+
+File descriptors are resolved into file names looking at
+C</proc/$pid/fd/$fd>. Pipes and sockets appear there as
+C<pipe:[$id]> and C<socket:[$id]> respectively, so for instance,
+the following command captures only I/O operations on pipes:
+
+    capio -N "pipe:*" ...
+
+=item -q
+
+Dumps only the captured data, suppresing any syscall information.
 
 =back
 
