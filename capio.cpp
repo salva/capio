@@ -94,6 +94,7 @@ struct Process {
     bool dumping;
     bool sigcall_exiting;
     string process_name;
+    string enter_args;
     struct user_regs_struct enter_regs;
 
     FDGroup *fdgroup(int fd);
@@ -354,6 +355,12 @@ read_proc_string_quoted(pid_t pid, long long mem, size_t len) {
     return "NULL";
 }
 
+static void*
+read_proc_ptr(pid_t pid, long long mem) {
+    const unsigned char *data = read_proc_mem(pid, mem, sizeof(void*));
+    return ((void**)data)[0];
+}
+
 static string
 read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen = 16384) {
     if (mem) {
@@ -373,6 +380,24 @@ read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen = 16384) {
         ss << "\"";
         return ss.str();
 
+    }
+    return "NULL";
+}
+
+static string
+read_proc_array_c_string_quoted(pid_t pid, long long mem) {
+    if (mem) {
+        stringstream ss;
+        ss << "[";
+        char **argv = (char **)mem;
+        for (int i = 0;; i++) {
+            void *arg = read_proc_ptr(pid, (long long)(argv + i));
+            if (!arg) break;
+            if (i > 0) ss << ", ";
+            ss << read_proc_c_string_quoted(pid, (long long)arg);
+        }
+        ss << "]";
+        return ss.str();
     }
     return "NULL";
 }
@@ -582,6 +607,7 @@ main(int argc, char *argv[]) {
                                 }
                                 break;
                             case SYS_open:
+                                p.close_fd(RC);
                                 if (p.dumping_fd(RC)) {
                                     if (!quiet) {
                                         dump_syscall_wo_endl(*out, pid, "open", RC, "filename:%s, flags:%lld, mode:%lld",
@@ -701,6 +727,7 @@ main(int argc, char *argv[]) {
                                     dump_syscall(*out, pid, "connect", RC, "fd:%lld", ARG0);
                                 break;
                             case SYS_accept:
+                                p.close_fd(RC);
                                 if (p.dumping_fd(ARG0) || p.dumping_fd(RC))
                                     dump_syscall(*out, pid, "accept", RC, "fd:%lld", ARG0);
                                 break;
@@ -711,8 +738,13 @@ main(int argc, char *argv[]) {
                             case SYS_execve: {
                                 bool was_dumping = p.dumping;
                                 p.reset_process_name();
-                                if (p.dumping || was_dumping)
-                                    dump_syscall(*out, pid, "execve", RC, "name:%s", p.process_name.c_str());
+                                if (quiet && p.dumping || was_dumping)  {
+                                    // sys_execve	const char *filename	const char *const argv[]	const char *const envp[]
+                                    dump_syscall_wo_endl(*out, pid, "execve", RC, "%s", p.enter_args.c_str());
+                                    *out << "; path:";
+                                    put_quoted(*out, p.process_name);
+                                    *out << endl;
+                                }
                                 break;
                             }
                             case SYS_dup:
@@ -815,6 +847,7 @@ main(int argc, char *argv[]) {
                                     dump_syscall(*out, pid, "inotify_rm_watch", RC, "fd:%lld, wd:%lld", ARG0, ARG1);
                                  break;
                             case SYS_openat:
+                                p.close_fd(RC);
                                 if (p.dumping_fd(ARG0) || p.dumping_fd(RC))
                                     dump_syscall(*out, pid, "openat", RC, "dfd:%lld, ..., flags:%ldd, mode:%ldd",
                                                  ARG0, ARG2, ARG3);
@@ -841,8 +874,20 @@ main(int argc, char *argv[]) {
                         p.sigcall_exiting = true;
                         ptrace(PTRACE_GETREGS, pid, NULL, &p.enter_regs);
                         struct user_regs_struct &regs = p.enter_regs;
+
                         debug(4, "ENTER pid: %d, orig_rax: %lld, rax: %lld, rdi: %lld, rsi: %lld, rdx: %lld, r10: %lld, r9: %lld, r8: %lld",
                               pid, OP, RC, ARG0, ARG1, ARG2, ARG3, ARG4, ARG5);
+
+                        switch(OP) {
+                        case SYS_execve:
+                            /* execve arguments are missing once execve returns so, we save them here */
+                            stringstream ss;
+                            ss << "name:" << read_proc_c_string_quoted(pid, ARG0)
+                               << ", args:" << read_proc_array_c_string_quoted(pid, ARG1)
+                               << ", env:" << read_proc_array_c_string_quoted(pid, ARG2);
+                            p.enter_args = ss.str();
+                            break;
+                        }
                     }
                 }
                 ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
