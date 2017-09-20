@@ -115,19 +115,19 @@ the following command captures only I/O operations on pipes:
 
 Dumps only the captured data, suppresing any syscall information.
 
-=item -E <perl_one_liner>
+=item -E I<perl_one_liner>
 
 I<Not implemented yet!>
 
 Calls the given Perl code for every I/O operation.
 
-=item -e <perl_one_liner>
+=item -e I<perl_one_liner>
 
 Calls the given Perl code for every I/O operation carrying a data load.
 
 See L</Perl scripting> below.
 
-=item -M <perl_script>
+=item -M I<perl_script>
 
 Loads the given Perl script which must define a subroutine named C<_>
 (yes, underscore!) to be called for every I/O operation on the traced
