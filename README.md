@@ -27,7 +27,35 @@ See the man page: https://github.com/salva/capio/blob/master/capio.pod
 
 * How does the underdocumented SCP protocol works?
 
-      capio -f -l5 -l6 -n "*/ssh" scp localhost:/etc/passwd /tmp/passwd
+      capio -f -mn -l0 -l1 -n "*/ssh" scp localhost:/etc/default/networking /tmp
+
+  Output in "quote with new lines" format:
+
+      # 3418 dup(fd:0) = 5
+      # 3418 dup(fd:1) = 6
+      # 3418 read(fd:5) = 1
+      < "\0"
+      # 3418 write(fd:6) = 21
+      > "C0644 306 networking\n"
+      # 3418 read(fd:5) = 1
+      < "\0"
+      # 3418 write(fd:6) = 307
+      > "# Configuration for networking init script being run during\n"
+      > "# the boot sequence\n"
+      > "\n"
+      > "# Set to 'no' to skip interfaces configuration on boot\n"
+      > "#CONFIGURE_INTERFACES=yes\n"
+      > "\n"
+      > "# Don't configure these interfaces. Shell wildcards supported/\n"
+      > "#EXCLUDE_INTERFACES=\n"
+      > "\n"
+      > "# Set to 'yes' to enable additional verbosity\n"
+      > "#VERBOSE=no\n"
+      > "\0"
+      # 3418 read(fd:5) = 1
+      < "\0"
+      # 3418 close(fd:6) = 0
+      # 3418 close(fd:5) = 0
 
 * Monitoring `tea4cups` IPP requests:
 
