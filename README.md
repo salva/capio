@@ -30,8 +30,8 @@ See the man page: https://github.com/salva/capio/blob/master/capio.pod
       capio -f -mn -l0 -l1 -n "*/ssh" scp localhost:/etc/default/networking /tmp
 
   Output in "quote with new lines" format. Note how `capio` follows
-  the `dups` syscalls and traces file descriptors 5 and 6 which are
-  aliases for the selected 0 and 1:
+  the `dups` syscalls and traces file descriptors 5 and 6 too, which
+  are aliases for the selected 0 and 1:
 
       # 3418 dup(fd:0) = 5
       # 3418 dup(fd:1) = 6
