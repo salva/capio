@@ -59,7 +59,9 @@ See the man page: https://github.com/salva/capio/blob/master/capio.pod
       # 3418 close(fd:6) = 0
       # 3418 close(fd:5) = 0
 
-* Monitoring `tea4cups` IPP requests:
+* Monitoring `tea4cups`
+  [IPP](https://en.wikipedia.org/wiki/Internet_Printing_Protocol)
+  requests:
 
   The `examples` directory contains the script `ipp.pl` that can be used to
   unpack IPP requests as follows:
