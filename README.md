@@ -27,15 +27,15 @@ See the man page: https://github.com/salva/capio/blob/master/capio.pod
 
 * How does the underdocumented SCP protocol works?
 
-    capio -f -l5 -l6 -n "*/ssh" scp localhost:/etc/passwd /tmp/passwd
+      capio -f -l5 -l6 -n "*/ssh" scp localhost:/etc/passwd /tmp/passwd
 
 * Monitoring `tea4cups` IPP requests:
 
   The `examples` directory contains the script `ipp.pl` that can be used to
   unpack IPP requests as follows:
 
-    sudo ./capio -f -n "/*/python*" -p `pidof cupsd` \
-         -N 'socket:*' -M examples/ipp.pl
+      sudo ./capio -f -n "/*/python*" -p `pidof cupsd` \
+           -N 'socket:*' -M examples/ipp.pl
 
 ## Bugs and support
 
