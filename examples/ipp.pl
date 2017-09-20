@@ -100,6 +100,7 @@ sub response {
 }
 
 sub _ {
+    next unless defined;
     my $id = join('-', $PID, $FD, $DIR);
     $buffer{$id} .= $_;
     my $handler = $handler{$id} //= \&start;

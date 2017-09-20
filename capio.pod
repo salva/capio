@@ -4,13 +4,22 @@ capio - trace and capture process I/O
 
 =head1 SYNOPSIS
 
-    capio [-f] [-q] [-F] [-lfd]... [-ppid]... [-mformat] [-ofile] [-nexe_pattern]... -N[fn_pattern]... [-- command [args]]
+    capio [-f] [-q] [-F] [-lfd]... [-ppid]... [-mformat] [-ofile] \
+          [-nexe_pattern]... -N[fn_pattern]...                    \
+          [-eperl_oneliner] [-Eperl_oneliner] [-Mperl_script]     \
+          [-- command [args]]
 
 =head1 DESCRIPTION
 
 In the simplest case B<capio> runs the specific command until it
 exits. It monitors I/O syscalls and dumps the data being passed.
 
+B<capio> provides options that can be used to target some specific
+programs and file descriptors, can dump its data in several formats.
+
+For more complex usage scenarios B<capio> can embed a perl interpreter
+that can be used to analyze the data as it is generated using custom
+scripts.
 
 =head1 OPTIONS
 
@@ -56,25 +65,25 @@ are as follows:
 
 =over 4
 
-=item x
+=item C<x>
 
 hexdump - dump the data in hexedecimal.
 
-=item q
+=item C<q>
 
 quote - dump the data as C strings with control and non printable
 charaters escaped.
 
-=item n
+=item C<n>
 
 quote with new lines - as quote mode but break the output at LF
 characters.
 
-=item r
+=item C<r>
 
 raw - dump the data without any processing
 
-=item 0
+=item C<0>
 
 nothing - dump nothing
 
@@ -105,6 +114,103 @@ the following command captures only I/O operations on pipes:
 =item -q
 
 Dumps only the captured data, suppresing any syscall information.
+
+=item -E <perl_one_liner>
+
+I<Not implemented yet!>
+
+Calls the given Perl code for every I/O operation.
+
+=item -e <perl_one_liner>
+
+Calls the given Perl code for every I/O operation carrying a data load.
+
+See L</Perl scripting> below.
+
+=item -M <perl_script>
+
+Loads the given Perl script which must define a subroutine named C<_>
+(yes, underscore!) to be called for every I/O operation on the traced
+process.
+
+See L</Perl scripting> below.
+
+=back
+
+=head1 PERL SCRIPTING
+
+In order to allow for complex processing of the data captured from the
+traced processes, it is possible to compile C<capio> with an embeded
+Perl interpreter.
+
+Perl support is far for being complete yet, but none the less, it is
+already useful.
+
+The embeded Perl interpreter can be invoked with the C<-M> flag with
+takes the name of a perl script or with the C<-e> or C<-E> flags which
+take directly a chunk of perl code (AKA one-liner).
+
+The difference between C<-e> and C<-E> been that the former calls the
+code only for operations carrying a data load while the second calls
+it for every traced syscall.
+
+In the case of using C<-M>, the given script must define the
+subroutine C<_> which would be called for every traced syscall.
+
+In the case of using C<-e> or C<-E> the subroutine C<_> is created
+automatically using the given chunk of code as its body.
+
+The following global variables are used to pass information to the Perl side:
+
+=over 4
+
+=item C<$_>
+
+The data load
+
+=item C<$PID>
+
+The process Id.
+
+=item C<$OP>
+
+The syscall name.
+
+=item C<$FD>
+
+The file descriptor number.
+
+=item C<$DIR>
+
+The direction of the data, C<R> for read operations and C<W> for write operations.
+
+=item C<$R>
+
+Bool variable indicating it is a read operation.
+
+=item C<$W>
+
+Bool variable indicating it is a write operation.
+
+=item C<$FN>
+
+The filename associated to the file descriptor.
+
+=item C<$EXE>
+
+The process executable path.
+
+=item C<$RC>
+
+The syscall return code.
+
+=item C<$MEM>
+
+The memory address for the data on the traced process.
+
+=item C<$LEN>
+
+The length of the data load.
 
 =back
 
