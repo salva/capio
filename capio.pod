@@ -214,13 +214,32 @@ The length of the data load.
 
 =back
 
+The B<capio> distribution has an C<examples> directory which several
+scripts that can be used for learning.
+
 =head1 EXAMPLES
+
+Some examples of C<capio> usage follow:
+
+=over 4
+
+=item Monitoring tea4cups IPP requests
 
 B<capio> was initially written for examining how L<cupsd(8)>
 interacted with its backends. The following command shows the dialogs
 with B<tea4cups> slave processes:
 
-    capio -p `pidof cupsd` -f -n `*/tea4cups' -N "socket:*"
+    sudo ./capio -f -n "/*/python*" -p `pidof cupsd` \
+         -N 'socket:*' -M examples/ipp.pl
+
+=item The underdocumented SCP protocol
+
+Have you ever wondered how SCP works under the hood?
+
+      capio -f -l5 -l6 -n "*/ssh" \
+            scp localhost:/etc/passwd /tmp/passwd
+
+=back
 
 =head1 BUGS AND SUPPORT
 
