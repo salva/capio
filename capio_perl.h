@@ -16,12 +16,21 @@ static SV *perl__;
 
 static void init_perl(int &argc, char **&argv, char **&env) {
     PERL_SYS_INIT3(&argc,&argv,&env);
+    my_perl = perl_alloc();
+    perl_construct(my_perl);
+}
+
+EXTERN_C void boot_DynaLoader (pTHX_ CV* cv);
+EXTERN_C void
+xs_init(pTHX) {
+    const char *file = __FILE__;
+    newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
 }
 
 static void parse_perl(string &code) {
-    string wrapped_code = "sub _ {\n" + code + "\n;}";
+    string wrapped_code = "use feature q(:all);\nsub _ {\n" + code + "\n;}";
     const char *perl_args[] = { "", "-e", wrapped_code.c_str() };
-    perl_parse(my_perl, NULL, 3, (char **)perl_args, NULL);
+    perl_parse(my_perl, xs_init, 3, (char **)perl_args, NULL);
 
     perl_RC  = SvREFCNT_inc(get_sv("RC" , GV_ADD));
     perl_PID = SvREFCNT_inc(get_sv("PID", GV_ADD));
@@ -67,3 +76,5 @@ dump_perl(Process &p, int fd, const string &op, long long rc, bool writting, lon
         LEAVE;
     }
 }
+
+
