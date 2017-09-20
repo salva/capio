@@ -29,10 +29,10 @@ static ostream *out;
 static bool quiet;
 static bool dont_follow = false;
 
-#ifdef CAPIO_PERL
+#ifdef WITH_PERL
 static string perl_code;
 static char perl_flag = '\0';
-#include "capio_perl.h"
+#include "perl.h"
 #endif
 
 static void
@@ -472,7 +472,7 @@ dump_syscall(ostream &out, pid_t pid, const char *name, long long rc, const char
 
 int
 main(int argc, char *argv[], char *env[]) {
-#ifdef CAPIO_PERL
+#ifdef WITH_PERL
     init_perl(argc, argv, env);
 #endif
     int opt;
@@ -519,7 +519,7 @@ main(int argc, char *argv[], char *env[]) {
         case 'q':
             quiet = true;
             break;
-#ifdef CAPIO_PERL
+#ifdef WITH_PERL
         case 'e':
         case 'E':
             if (perl_flag)
@@ -536,7 +536,7 @@ main(int argc, char *argv[], char *env[]) {
         }
     }
 
-#ifdef CAPIO_PERL
+#ifdef WITH_PERL
     if (perl_flag)
         parse_perl(perl_code);
 #endif
