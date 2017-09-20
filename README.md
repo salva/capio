@@ -25,7 +25,7 @@ See the man page: https://github.com/salva/capio/blob/master/capio.pod
 
 ## Examples
 
-* How does the underdocumented SCP protocol works?
+* How does the underdocumented SCP protocol work?
 
       capio -f -mn -l0 -l1 -n "*/ssh" scp localhost:/etc/default/networking /tmp
 
