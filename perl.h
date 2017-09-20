@@ -7,11 +7,13 @@ static SV *perl_RC;
 static SV *perl_PID;
 static SV *perl_W;
 static SV *perl_R;
+static SV *perl_DIR;
 static SV *perl_MEM;
 static SV *perl_OP;
 static SV *perl_FD;
 static SV *perl_FN;
 static SV *perl_EXE;
+static SV *perl_LEN;
 static SV *perl__;
 
 static void init_perl(int &argc, char **&argv, char **&env) {
@@ -28,37 +30,57 @@ xs_init(pTHX) {
 }
 
 static void parse_perl(string &code) {
-    string wrapped_code = "use feature q(:all);\nsub _ {\n" + code + "\n;}";
-    const char *perl_args[] = { "", "-e", wrapped_code.c_str() };
-    perl_parse(my_perl, xs_init, 3, (char **)perl_args, NULL);
+    switch (perl_flag) {
+    case 'E':
+    case 'e': {
+        string wrapped_code = "sub _ {\n" + code + "\n;}";
+        const char *perl_args[] = { "", "-Mfeature=:all", "-e", wrapped_code.c_str() };
+        if (perl_parse(my_perl, xs_init, 3, (char **)perl_args, NULL))
+            fatal("Perl parsing failed");
+        break;
+    }
+    case 'M': {
+        const char *perl_args[] = { "", code.c_str(), };
+        if (perl_parse(my_perl, xs_init, 3, (char **)perl_args, NULL))
+            fatal("Perl parsing failed");
+        if (perl_run(my_perl))
+            fatal("Perl running failed");
+        break;
+    }
+    default:
+        fatal("Internal error: unsupported perl_flag");
+    }
 
     perl_RC  = SvREFCNT_inc(get_sv("RC" , GV_ADD));
     perl_PID = SvREFCNT_inc(get_sv("PID", GV_ADD));
     perl_W   = SvREFCNT_inc(get_sv("W"  , GV_ADD));
-    perl_R   = SvREFCNT_inc(get_sv("E"  , GV_ADD));
+    perl_R   = SvREFCNT_inc(get_sv("R"  , GV_ADD));
+    perl_DIR = SvREFCNT_inc(get_sv("DIR", GV_ADD));
     perl_MEM = SvREFCNT_inc(get_sv("MEM", GV_ADD));
     perl_OP  = SvREFCNT_inc(get_sv("OP" , GV_ADD));
     perl_FD  = SvREFCNT_inc(get_sv("FD" , GV_ADD));
     perl_FN  = SvREFCNT_inc(get_sv("FN" , GV_ADD));
     perl_EXE = SvREFCNT_inc(get_sv("EXE", GV_ADD));
+    perl_LEN = SvREFCNT_inc(get_sv("LEN", GV_ADD));
     perl__   = SvREFCNT_inc(get_sv("_"  , GV_ADD));
 
 }
 
 static void
 dump_perl(Process &p, int fd, const string &op, long long rc, bool writting, long long mem, size_t len) {
-    if (mem || perl_flag == 'E') {
+    if (mem || perl_flag == 'E' || perl_flag == 'M') {
         sv_setiv(perl_RC, rc);
         sv_setiv(perl_PID, p.pid);
         sv_setsv(perl_W, (writting ? &PL_sv_yes : &PL_sv_no));
         sv_setsv(perl_R, (writting ? &PL_sv_no : &PL_sv_yes));
+        sv_setpvn(perl_DIR, (writting ? "W" : "R"), 1);
         sv_setiv(perl_MEM, mem);
         sv_setpvn(perl_OP, op.c_str(), op.length());
         sv_setiv(perl_FD, fd);
         const string &fd_path = p.fd_path(fd);
         sv_setpvn(perl_FN, fd_path.c_str(), fd_path.length());
         sv_setpvn(perl_EXE, p.process_name.c_str(), p.process_name.length());
-
+        sv_setiv(perl_LEN, len);
         if (mem) {
             const unsigned char *data = read_proc_mem(p.pid, mem, len);
             sv_setpvn(perl__, (char *)data, len);

@@ -171,7 +171,7 @@ FDGroup::rm_fd(int fd) {
         dumping = true;
 }
 
-static void
+void
 fatal(const char *msg) {
     perror(msg);
     exit(EXIT_FAILURE);
@@ -283,7 +283,7 @@ get_buffer(size_t len) {
     return buffer;
 }
 
-static const unsigned char *
+const unsigned char *
 read_proc_mem(pid_t pid, long long mem, size_t len) {
     if (len) {
         size_t i, offset, len_long;
@@ -479,7 +479,7 @@ main(int argc, char *argv[], char *env[]) {
     int fd;
     pid_t pid;
     out = &cout;
-    while ((opt = getopt(argc, argv, "o:m:p:n:N:l:e:E:fdqF")) != -1) {
+    while ((opt = getopt(argc, argv, "o:m:M:p:n:N:l:e:E:fdqF")) != -1) {
         switch (opt) {
         case 'p':
             pid = atol(optarg);
@@ -522,6 +522,7 @@ main(int argc, char *argv[], char *env[]) {
 #ifdef WITH_PERL
         case 'e':
         case 'E':
+        case 'M':
             if (perl_flag)
                 fatal("e and E flags are exclusive");
             perl_flag = opt;
@@ -598,22 +599,26 @@ main(int argc, char *argv[], char *env[]) {
                                 writting = true;
                             case SYS_read:
                                 if (p.dumping_fd(ARG0)) {
-                                    dump_syscall(*out, pid,
-                                                 (writting ? "write" : "read"),
-                                                 RC, "fd:%lld", ARG0);
+                                    const char *syscall_name = (writting ? "write" : "read");
+                                    dump_syscall(*out, pid, syscall_name, RC, "fd:%lld", ARG0);
                                     dump_mem(*out, format, writting, pid, ARG1, RC);
+#ifdef WITH_PERL
                                     if (perl_flag)
-                                        dump_perl(p, ARG0, (writting ? "write" : "read"), RC, writting, ARG1, RC);
+                                        dump_perl(p, ARG0, syscall_name, RC, writting, ARG1, RC);
+#endif
                                 }
                                 break;
                             case SYS_sendto:
                                 writting = true;
                             case SYS_recvfrom:
                                 if (p.dumping_fd(ARG0)) {
-                                    dump_syscall(*out, pid,
-                                                 (writting ? "sendto" : "recvfrom"),
-                                                 RC, "fd:%lld, ...", ARG0);
+                                    const char *syscall_name = (writting ? "sendto" : "recvfrom");
+                                    dump_syscall(*out, pid, syscall_name, RC, "fd:%lld, ...", ARG0);
                                     dump_mem(*out, format, writting, pid, ARG1, RC);
+#ifdef WITH_PERL
+                                    if (perl_flag)
+                                        dump_perl(p, ARG0, syscall_name, RC, writting, ARG1, RC);
+#endif
                                 }
                                 break;
                             case SYS_open:
@@ -640,11 +645,10 @@ main(int argc, char *argv[], char *env[]) {
                                 writting = true;
                             case SYS_recvmsg:
                                 if (p.dumping_fd(ARG0)) {
+                                    const char *syscall_name = (writting ? "sendmsg" : "recvmsg");
                                     struct msghdr msg;
                                     read_proc_struct(pid, ARG1, sizeof(msg), (void*)&msg);
-                                    dump_syscall(*out, pid,
-                                                 (writting ? "sendmsg" : "recvmsg"),
-                                                 RC,
+                                    dump_syscall(*out, pid, syscall_name, RC,
                                                  "fd:%lld, name:%s, iovlen:%lld, control:%s",
                                                  ARG0,
                                                  read_proc_string_quoted(pid, (long long)msg.msg_name,
@@ -658,6 +662,10 @@ main(int argc, char *argv[], char *env[]) {
                                         read_proc_struct(pid, (long long)(msg.msg_iov + i), sizeof(iov), &iov);
                                         size_t chunk = ((remaining > iov.iov_len) ? iov.iov_len : remaining);
                                         dump_mem(*out, format, writting, pid, (long long)iov.iov_base, chunk);
+#ifdef WITH_PERL
+                                        if (perl_flag)
+                                            dump_perl(p, ARG0, syscall_name, RC,  writting, (long long)iov.iov_base, chunk);
+#endif
                                         remaining -= chunk;
                                     }
                                 }
@@ -670,19 +678,21 @@ main(int argc, char *argv[], char *env[]) {
                                 writting = true;
                             case SYS_pread64:
                                 if (p.dumping_fd(ARG0)) {
-                                    dump_syscall(*out, pid,
-                                                 (writting ? "pwrite" : "pread"),
-                                                 RC, "fd:%lld, pos:%lld", ARG0, ARG3);
+                                    const char *syscall_name = (writting ? "pwrite" : "pread");
+                                    dump_syscall(*out, pid, syscall_name, RC, "fd:%lld, pos:%lld", ARG0, ARG3);
                                     dump_mem(*out, format, writting, pid, ARG1, RC);
+#ifdef WITH_PERL
+                                    if (perl_flag)
+                                        dump_perl(p, ARG0, syscall_name, RC, writting, ARG1, RC);
+#endif
                                 }
                                 break;
                             case SYS_writev:
                                 writting = 1;
                             case SYS_readv:
                                 if (p.dumping_fd(ARG0)) {
-                                    dump_syscall(*out, pid,
-                                                 (writting ? "writev" : "readv"),
-                                                 RC, "fd:%lld", ARG0);
+                                    const char *syscall_name = (writting ? "writev" : "readv");
+                                    dump_syscall(*out, pid, syscall_name, RC, "fd:%lld", ARG0);
                                     size_t remaining = RC;
                                     struct iovec *vec = (struct iovec *)ARG2;
                                     for (size_t i = 0; remaining && i < ARG3; i++) {
@@ -690,6 +700,10 @@ main(int argc, char *argv[], char *env[]) {
                                         read_proc_struct(pid, (long long)(vec + i), sizeof(iov), &iov);
                                         size_t chunk = ((remaining > iov.iov_len) ? iov.iov_len : remaining);
                                         dump_mem(*out, format, writting, pid, (long long)iov.iov_base, chunk);
+#ifdef WITH_PERL
+                                        if (perl_flag)
+                                            dump_perl(p, ARG0, syscall_name, RC, writting, (long long)iov.iov_base, chunk);
+#endif
                                         remaining -= chunk;
                                     }
                                 }

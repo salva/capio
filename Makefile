@@ -1,7 +1,7 @@
 
 H_FILES := capio.h
 
-ifeq ($(WITH_PERL),)
+ifneq ($(WITH_PERL),)
 	PERL_ARCHLIB := $(shell perl -MConfig -E 'say $$Config{archlib}')
 	CPPFLAGS := $(CPPFLAGS) -DWITH_PERL -I"$(PERL_ARCHLIB)/CORE"
 	LDFLAGS := $(LDFLAGS) -lperl

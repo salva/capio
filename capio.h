@@ -31,5 +31,5 @@ private:
     unordered_map<int,FDGroup*> fdgroups;
 };
 
-static const unsigned char*
-read_proc_mem(pid_t pid, long long mem, size_t len);
+const unsigned char* read_proc_mem(pid_t pid, long long mem, size_t len);
+void fatal(const char *msg);
