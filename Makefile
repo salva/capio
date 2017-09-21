@@ -13,7 +13,7 @@ endif
 all: capio capio.1
 
 capio: capio.cpp $(H_FILES)
-	g++ $(CPPFLAGS) -O0 -g capio.cpp $(LDFLAGS) -o capio
+	g++ -std=gnu++11 $(CPPFLAGS) -O0 -g capio.cpp $(LDFLAGS) -o capio
 
 capio.1: capio.pod
 	pod2man -center "General Commands Manual" -section 1 capio.pod >capio.1
