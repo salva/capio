@@ -57,6 +57,8 @@ static void parse_perl(int out, string &code) {
     OUT_fd = SvIV(eval_pv(open_out.c_str(), 0));
     last_out = out;
 
+    debug(4, "perl OUT_fd:%d, last_out:%d", OUT_fd, last_out);
+
     sv_setiv_mg(get_sv("|", GV_ADD), 1);
 
     if (perl_run(my_perl))
@@ -81,6 +83,7 @@ static void
 dump_perl(int out, Process &p, int fd, const string &op, long long rc, bool writting, long long mem, size_t len) {
     if (mem || perl_flag == 'E' || perl_flag == 'M') {
 
+        debug(4, "perl OUT_fd:%d, out:%d, last_out:%d", OUT_fd, out, last_out);
         if (out != last_out) {
             dup2(out, OUT_fd);
             last_out = out;
@@ -127,6 +130,8 @@ static void perl_sys_term() {
 }
 
 static void fd_close_perl(int fd) {
-    if (last_out == fd)
+    debug(4, "forgetting fd %d, last_fd is %d", fd, last_out);
+    if (last_out == fd) {
         last_out = -1;
+    }
 }

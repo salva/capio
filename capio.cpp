@@ -950,9 +950,9 @@ main(int argc, char *argv[], char *env[]) {
                 debug(1, "Doing nothing for pid %d - wstatus: %d", pid, wstatus);
                 continue;
             }
-#ifdef PERL
-            if (pp.out)
-                fd_close_perl(pp.out);
+#ifdef WITH_PERL
+            if (pp->out)
+                fd_close_perl(*pp->out);
 #endif
             processes.erase(pid);
             delete pp;

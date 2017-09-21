@@ -1,4 +1,5 @@
 
+static void debug(int level, const char *fmt...);
 const unsigned char* read_proc_mem(pid_t pid, long long mem, size_t len);
 void fatal(const char *msg);
 
