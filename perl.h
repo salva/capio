@@ -15,6 +15,10 @@ static SV *perl_FN;
 static SV *perl_EXE;
 static SV *perl_LEN;
 static SV *perl__;
+static GV *perl_OUT;
+
+static int OUT_fd = -1;
+static int last_out = -1;
 
 static void init_perl(int &argc, char **&argv, char **&env) {
     PERL_SYS_INIT3(&argc,&argv,&env);
@@ -29,7 +33,7 @@ xs_init(pTHX) {
     newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
 }
 
-static void parse_perl(string &code) {
+static void parse_perl(int out, string &code) {
     switch (perl_flag) {
     case 'E':
     case 'e': {
@@ -43,13 +47,20 @@ static void parse_perl(string &code) {
         const char *perl_args[] = { "", code.c_str(), };
         if (perl_parse(my_perl, xs_init, 3, (char **)perl_args, NULL))
             fatal("Perl parsing failed");
-        if (perl_run(my_perl))
-            fatal("Perl running failed");
         break;
     }
     default:
         fatal("Internal error: unsupported perl_flag");
     }
+
+    string open_out = "open OUT, '>&" + to_string(out) + "' or die q(Unable to open OUT); select OUT; $|=1; fileno(OUT)";
+    OUT_fd = SvIV(eval_pv(open_out.c_str(), 0));
+    last_out = out;
+
+    sv_setiv_mg(get_sv("|", GV_ADD), 1);
+
+    if (perl_run(my_perl))
+        fatal("Perl running failed");
 
     perl_RC  = SvREFCNT_inc(get_sv("RC" , GV_ADD));
     perl_PID = SvREFCNT_inc(get_sv("PID", GV_ADD));
@@ -67,26 +78,32 @@ static void parse_perl(string &code) {
 }
 
 static void
-dump_perl(Process &p, int fd, const string &op, long long rc, bool writting, long long mem, size_t len) {
+dump_perl(int out, Process &p, int fd, const string &op, long long rc, bool writting, long long mem, size_t len) {
     if (mem || perl_flag == 'E' || perl_flag == 'M') {
-        sv_setiv(perl_RC, rc);
-        sv_setiv(perl_PID, p.pid);
-        sv_setsv(perl_W, (writting ? &PL_sv_yes : &PL_sv_no));
-        sv_setsv(perl_R, (writting ? &PL_sv_no : &PL_sv_yes));
-        sv_setpvn(perl_DIR, (writting ? "W" : "R"), 1);
-        sv_setiv(perl_MEM, mem);
-        sv_setpvn(perl_OP, op.c_str(), op.length());
-        sv_setiv(perl_FD, fd);
+
+        if (out != last_out) {
+            dup2(out, OUT_fd);
+            last_out = out;
+        }
+
+        sv_setiv_mg(perl_RC, rc);
+        sv_setiv_mg(perl_PID, p.pid);
+        SvSetMagicSV(perl_W, (writting ? &PL_sv_yes : &PL_sv_no));
+        SvSetMagicSV(perl_R, (writting ? &PL_sv_no : &PL_sv_yes));
+        sv_setpvn_mg(perl_DIR, (writting ? "W" : "R"), 1);
+        sv_setiv_mg(perl_MEM, mem);
+        sv_setpvn_mg(perl_OP, op.c_str(), op.length());
+        sv_setiv_mg(perl_FD, fd);
         const string &fd_path = p.fd_path(fd);
-        sv_setpvn(perl_FN, fd_path.c_str(), fd_path.length());
-        sv_setpvn(perl_EXE, p.process_name.c_str(), p.process_name.length());
-        sv_setiv(perl_LEN, len);
+        sv_setpvn_mg(perl_FN, fd_path.c_str(), fd_path.length());
+        sv_setpvn_mg(perl_EXE, p.process_name.c_str(), p.process_name.length());
+        sv_setiv_mg(perl_LEN, len);
         if (mem) {
             const unsigned char *data = read_proc_mem(p.pid, mem, len);
-            sv_setpvn(perl__, (char *)data, len);
+            sv_setpvn_mg(perl__, (char *)data, len);
         }
         else
-            sv_setsv(perl__, &PL_sv_undef);
+            SvSetMagicSV(perl__, &PL_sv_undef);
 
         dSP;
         ENTER;
@@ -99,4 +116,12 @@ dump_perl(Process &p, int fd, const string &op, long long rc, bool writting, lon
     }
 }
 
+static void
+shutdown_perl() {
+    perl_destruct(my_perl);
+    perl_free(my_perl);
+}
 
+static void perl_sys_term() {
+    PERL_SYS_TERM();
+}
