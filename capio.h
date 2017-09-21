@@ -4,26 +4,26 @@ void fatal(const char *msg);
 
 struct dual_ostream : ostream {
 private:
-    __gnu_cxx::stdio_filebuf<char> *filebuf;
     static int ensure_open(const string &fn) {
         int fd = open(fn.c_str(), O_CREAT|O_CLOEXEC|O_APPEND|O_TRUNC|O_WRONLY, 0666);
-        if (fd < 0) fatal(fn.c_str());
+
         return fd;
     }
-
-    dual_ostream(int fd_, __gnu_cxx::stdio_filebuf<char> *filebuf_) :
-        fd(fd_),
-        filebuf(filebuf_),
-        ostream(filebuf_) {}
-public:
     int fd;
-    dual_ostream(int fd_) : dual_ostream(fd_, new __gnu_cxx::stdio_filebuf<char>(fd_, std::ios::out)) {}
-    dual_ostream(string &filename) : dual_ostream(ensure_open(filename.c_str())) {}
-    ~dual_ostream() {
-        this->flush();
-        cerr << string("dual_ostream destructor for ") + to_string((long long)this) + " called, fd: " + to_string(fd) <<endl;
+public:
+    dual_ostream(int fd_) :
+        fd(fd_) {
+        rdbuf(new  __gnu_cxx::stdio_filebuf<char>(fd, std::ios::out));
     }
-
+    dual_ostream(string &fn) {
+        fd = open(fn.c_str(), O_CREAT|O_CLOEXEC|O_APPEND|O_TRUNC|O_WRONLY, 0666);
+        if (fd < 0) fatal(fn.c_str());
+        rdbuf(new  __gnu_cxx::stdio_filebuf<char>(fd, std::ios::out));
+    }
+    ~dual_ostream() {
+        flush();
+        delete rdbuf();
+    }
     operator int() { return fd; }
 };
 

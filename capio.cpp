@@ -91,7 +91,9 @@ Process::Process(pid_t pid)
     debug(4, "New process structure with pid %d", pid);
 }
 
-Process::~Process() {}
+Process::~Process() {
+    if (out) delete out;
+}
 
 void
 Process::reset_process_name() {
@@ -592,15 +594,14 @@ main(int argc, char *argv[], char *env[]) {
                 if (ptrace(PTRACE_SETOPTIONS, pid, 0, options) < 0)
                     debug(1, "Unable to set ptrace options to %d for pid %d", options, pid);
                 p.initialized = true;
-
-                if (multifile && out_fn) {
-                    string full_name = *out_fn + "." + to_string(pid);
-                    p.out = new dual_ostream(full_name);
-                }
             }
 
+            if (multifile && p.dumping && !p.out) {
+                string full_name = *out_fn + "." + to_string(pid);
+                p.out = new dual_ostream(full_name);
+            }
             dual_ostream &out = (p.out ? *p.out : *default_out);
-            
+
             if (WIFSTOPPED(wstatus)) {
                 int sig = WSTOPSIG(wstatus);
                 debug(3, "Process %d stopped by signal %d", pid, sig);
