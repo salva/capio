@@ -15,7 +15,8 @@ Clone the GitHub repository at https://github.com/salva/capio.git and
 run `make`.
 
 If you want to compile capio with Perl support (highly recommended),
-run `make` as follows:
+you will need to install perl development files (package `libperl-dev`
+in Debian and derived distributions) and then run `make` as follows:
 
     make WITH_PERL=1
 
