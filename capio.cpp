@@ -86,7 +86,7 @@ static unordered_map<pid_t, Process*> processes;
 
 Process::Process(pid_t pid)
     : pid(pid), dumping(true),
-      sigcall_exiting(false), initialized(false) {
+      sigcall_exiting(false), initialized(false), out(NULL) {
     reset_process_name();
     debug(4, "New process structure with pid %d", pid);
 }
@@ -950,6 +950,10 @@ main(int argc, char *argv[], char *env[]) {
                 debug(1, "Doing nothing for pid %d - wstatus: %d", pid, wstatus);
                 continue;
             }
+#ifdef PERL
+            if (pp.out)
+                fd_close_perl(pp.out);
+#endif
             processes.erase(pid);
             delete pp;
         }

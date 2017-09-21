@@ -125,3 +125,8 @@ shutdown_perl() {
 static void perl_sys_term() {
     PERL_SYS_TERM();
 }
+
+static void fd_close_perl(int fd) {
+    if (last_out == fd)
+        last_out = -1;
+}

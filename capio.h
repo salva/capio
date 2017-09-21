@@ -45,6 +45,7 @@ struct Process {
     string process_name;
     string enter_args;
     struct user_regs_struct enter_regs;
+    dual_ostream *out;
 
     Process(pid_t pid);
     ~Process();
@@ -55,7 +56,6 @@ struct Process {
     bool dumping_fd(int fd);
     void reset_process_name();
     const string &fd_path(int fd);
-    dual_ostream *out;
 private:
     unordered_map<int,FDGroup*> fdgroups;
 };
