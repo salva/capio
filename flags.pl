@@ -10,34 +10,59 @@ use Data::Dumper;
 our $debug = 1;
 
 my $from = shift // 'flags.yaml';
-my $to = shift // $from =~ s/(:?\.yaml)?$/.cc/r;
+my $to_cc = shift // $from =~ s/(:?\.yaml)?$/.cc/r;
+my $to_h = shift // $to_cc =~ s/(:?\.cc)?$/.h/r;
 
 my $data = YAML::LoadFile($from) or die "invalid data in YAML file $from";
 
 $debug and warn Dumper($data) ."\n";
 
-open my $out, '>', $to or die "$to: $!";
+open my $out_cc, '>', $to_cc or die "$to_cc: $!";
+open my $out_h, '>', $to_h or die "$to_h: $!";
 
 for my $header (@{$data->{headers}}) {
-    print $out <<EOC;
+    print $out_h <<EOH;
 #include <$header>
-EOC
+EOH
 }
 
-print $out <<EOC;
+print $out_h <<EOH;
 #include <string>
-using namespace std;
-EOC
+EOH
+
+print $out_cc <<EOCC;
+#include "$to_h"
+EOCC
 
 my $groups = $data->{groups};
 for my $name (sort keys %$groups) {
-    print $out <<EOC;
-static string
+
+    print $out_h <<EOH;
+std::string ${name}_flags2string(long long);
+EOH
+    print $out_cc <<EOCC;
+std::string
 ${name}_flags2string(long long flags) {
-    string s("");
-EOC
-    for my $flag (@{$groups->{$name}}) {
-        print $out <<EOC;
+    std::string s("");
+EOCC
+    my $group = $groups->{$name};
+    my $exclusive = $group->{exclusive};
+    if ($exclusive) {
+        for my $exc (@$exclusive) {
+            my $flags = $exc->{flags};
+            my $mask = $exc->{mask} // join('|', @$flags);
+            for my $flag (@$flags) {
+                print $out_cc <<EOCC;
+    if ((flags & ($mask)) == $flag)
+        s += "$flag|";
+EOCC
+            }
+        }
+    }
+    my $flags = $groups->{$name}{flags};
+    if ($flags) {
+        for my $flag (@$flags) {
+            print $out_cc <<EOCC;
     if ($flag == 0) {
         if (flags == 0)
             s += "$flag|";
@@ -46,12 +71,16 @@ EOC
         if ((flags & $flag) == $flag)
             s += "$flag|";
     }
-EOC
+EOCC
+        }
     }
-    print $out <<EOC;
-    s += to_string(flags);
+    print $out_cc <<EOCC;
+    s += std::to_string(flags);
     return s;
 }
 
-EOC
+EOCC
 }
+
+close $to_cc;
+close $to_h;

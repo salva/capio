@@ -20,6 +20,7 @@
 using namespace std;
 
 #include "capio.h"
+#include "flags.h"
 
 static int debug_level = 0;
 static unordered_map<int, bool> dumping_fds;
@@ -484,7 +485,7 @@ main(int argc, char *argv[], char *env[]) {
     int opt;
     int fd;
     pid_t pid;
-    string *out_fn;
+    string *out_fn = NULL;
 
     while ((opt = getopt(argc, argv, "o:m:M:p:n:N:l:e:E:fdqFO")) != -1) {
         switch (opt) {
@@ -636,7 +637,8 @@ main(int argc, char *argv[], char *env[]) {
                             case SYS_recvfrom:
                                 if (p.dumping_fd(ARG0)) {
                                     const char *syscall_name = (writting ? "sendto" : "recvfrom");
-                                    dump_syscall(out, pid, syscall_name, RC, "fd:%lld, ...", ARG0);
+                                    dump_syscall(out, pid, syscall_name, RC, "fd:%lld, flags:%s",
+                                                 ARG0, msg_flags2string(ARG3).c_str());
                                     dump_mem(out, format, writting, pid, ARG1, RC);
 #ifdef WITH_PERL
                                     if (perl_flag)
@@ -648,8 +650,10 @@ main(int argc, char *argv[], char *env[]) {
                                 p.close_fd(RC);
                                 if (p.dumping_fd(RC)) {
                                     if (!quiet) {
-                                        dump_syscall_wo_endl(out, pid, "open", RC, "filename:%s, flags:%lld, mode:%lld",
-                                                             read_proc_c_string_quoted(pid, (long long)ARG0).c_str(), ARG1, ARG2);
+                                        dump_syscall_wo_endl(out, pid, "open", RC, "filename:%s, flags:%s, mode:0%03llo",
+                                                             read_proc_c_string_quoted(pid, (long long)ARG0).c_str(),
+                                                             o_flags2string(ARG1).c_str(),
+                                                             ARG2);
                                         (out) << "; path:";
                                         put_quoted(out, p.fd_path(RC));
                                         (out) << endl;

@@ -1,5 +1,5 @@
 
-H_FILES := capio.h
+H_FILES := capio.h flags.h
 
 ifneq ($(WITH_PERL),)
 	PERL_ARCHLIB := $(shell perl -MConfig -E 'say $$Config{archlib}')
@@ -8,7 +8,7 @@ ifneq ($(WITH_PERL),)
 	H_FILES += perl.h
 endif
 
-CXXFLAGS += -std=gnu++11
+CXXFLAGS += -std=gnu++11 -g -O0
 CC := g++
 
 all: capio capio.1
@@ -18,8 +18,11 @@ all: capio capio.1
 
 capio: capio.o flags.o
 
+flags.h: flags.pl flags.yaml
+	perl ./flags.pl flags.yaml flags.cc flags.h
+
 flags.cc: flags.pl flags.yaml
-	perl ./flags.pl flags.yaml flags.cc
+	perl ./flags.pl flags.yaml flags.cc flags.h
 
 capio.1: capio.pod
 	pod2man -center "General Commands Manual" -section 1 capio.pod >capio.1
