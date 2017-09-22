@@ -396,13 +396,6 @@ size_t round_up_len(size_t len) {
     return ((len + sizeof(long) - 1) & ~(sizeof(long) - 1));
 }
 
-string in_addr2string(const in_addr &ad) {
-    unsigned long n = ad.s_addr;
-    stringstream ss;
-    ss << ((n >> 24) & 255) << "." << ((n >> 16) & 255) << "." << ((n > 8) & 255) << "." << (n & 255);
-    return ss.str();
-}
-
 static string
 read_proc_sockaddr(pid_t pid, long long mem, size_t len) {
     if (mem) {
@@ -440,8 +433,8 @@ read_proc_sockaddr(pid_t pid, long long mem, size_t len) {
                 if (len < sizeof(struct sockaddr_in)) goto invalid;
                 else {
                     auto addr_in = (const struct sockaddr_in*)addr;
-                    ss << ", port:" << addr_in->sin_port
-                       << ", addr:" << in_addr2string(addr_in->sin_addr);
+                    ss << ", port:" << ntohs(addr_in->sin_port)
+                       << ", addr:" << inet_ntoa(addr_in->sin_addr);
                 }
                 break;
             default:
@@ -535,7 +528,7 @@ static void
 dump_syscall_end(ostream &out, long long rc) {
     out << " = ";
     if (rc < 0)
-        out << " = -1, errno:" << e_flag2string(-rc);
+        out << " = -1, errno:" << e_flags2string(-rc);
     else
         out << rc;
 }
@@ -701,7 +694,7 @@ main(int argc, char *argv[], char *env[]) {
                         debug(4, "EXIT pid: %d, orig_rax: %lld, rax: %lld, rdi: %lld, rsi: %lld, rdx: %lld, r10: %lld, r9: %lld, r8: %lld",
                               pid, OP, RC, ARG0, ARG1, ARG2, ARG3, ARG4, ARG5);
 
-                        if (RC >= 0 || RC == EINPROGRESS) {
+                        if (RC >= 0 || RC == -EINPROGRESS) {
                             bool writting = false;
                             bool dumping = p.dumping;
                             switch(OP) {
