@@ -17,6 +17,10 @@
 #include <ext/stdio_filebuf.h>
 #include <bits/stdc++.h>
 
+#include <linux/netlink.h>
+#include <linux/un.h>
+//#include <linux/in.h>
+
 using namespace std;
 
 #include "capio.h"
@@ -375,6 +379,84 @@ read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen = 16384) {
 }
 
 static string
+chars2hex(const unsigned char *s, size_t len) {
+    if (s) {
+        stringstream ss;
+        for (int i = 0; i < len; i++) {
+            char buffer[4];
+            sprintf(buffer, "%02x", s[i]);
+            ss << buffer;
+        }
+        return ss.str();
+    }
+    return "*NULL*";
+}
+
+size_t round_up_len(size_t len) {
+    return ((len + sizeof(long) - 1) & ~(sizeof(long) - 1));
+}
+
+string in_addr2string(const in_addr &ad) {
+    unsigned long n = ad.s_addr;
+    stringstream ss;
+    ss << ((n >> 24) & 255) << "." << ((n >> 16) & 255) << "." << ((n > 8) & 255) << "." << (n & 255);
+    return ss.str();
+}
+
+static string
+read_proc_sockaddr(pid_t pid, long long mem, size_t len) {
+    if (mem) {
+        stringstream ss;
+        size_t rlen = round_up_len(len);
+        const unsigned char *data = read_proc_mem(pid, mem, rlen);
+        ss << "{[len:" << len << ", rlen:" << rlen << "]";
+        if (len < sizeof(sa_family_t)) {
+            ss << ", invalid:" << chars2hex(data, len);
+        }
+        else {
+            auto addr = (const struct sockaddr *)data;
+            sa_family_t af = addr->sa_family;
+            ss << ", sa_family:" << af_flags2string(af);
+            switch(af) {
+            case AF_NETLINK:
+                if (len < sizeof(struct sockaddr_nl)) goto invalid;
+                else {
+                    auto addr_nl = (const struct sockaddr_nl*)addr;
+                    ss << ", pad:" << addr_nl->nl_pad
+                       << ", pid:" << addr_nl->nl_pid
+                       << ", groups:" << addr_nl->nl_groups;
+                }
+                break;
+            case AF_LOCAL:
+                if (len < sizeof(struct sockaddr_un)) goto invalid;
+                else {
+                    auto addr_un = (const struct sockaddr_un*)addr;
+                    ss << ", path:";
+                    put_quoted(ss, addr_un->sun_path,
+                               strnlen(addr_un->sun_path, UNIX_PATH_MAX));
+                }
+                break;
+            case AF_INET:
+                if (len < sizeof(struct sockaddr_in)) goto invalid;
+                else {
+                    auto addr_in = (const struct sockaddr_in*)addr;
+                    ss << ", port:" << addr_in->sin_port
+                       << ", addr:" << in_addr2string(addr_in->sin_addr);
+                }
+                break;
+            default:
+            invalid:
+                ss << ", invalid:" << chars2hex(data, len);
+                    break;
+            }
+        }
+        ss << "}";
+        return ss.str();
+    }
+    return "NULL";
+}
+
+static string
 read_proc_array_c_string_quoted(pid_t pid, long long mem) {
     if (mem) {
         stringstream ss;
@@ -451,7 +533,11 @@ dump_syscall_argsv(ostream &out, const char *fmt, va_list args) {
 
 static void
 dump_syscall_end(ostream &out, long long rc) {
-    out << " = " << rc;
+    out << " = ";
+    if (rc < 0)
+        out << " = -1, errno:" << e_flag2string(-rc);
+    else
+        out << rc;
 }
 
 static void
@@ -615,7 +701,7 @@ main(int argc, char *argv[], char *env[]) {
                         debug(4, "EXIT pid: %d, orig_rax: %lld, rax: %lld, rdi: %lld, rsi: %lld, rdx: %lld, r10: %lld, r9: %lld, r8: %lld",
                               pid, OP, RC, ARG0, ARG1, ARG2, ARG3, ARG4, ARG5);
 
-                        if (RC >= 0) {
+                        if (RC >= 0 || RC == EINPROGRESS) {
                             bool writting = false;
                             bool dumping = p.dumping;
                             switch(OP) {
@@ -651,7 +737,7 @@ main(int argc, char *argv[], char *env[]) {
                                 if (p.dumping_fd(RC)) {
                                     if (!quiet) {
                                         dump_syscall_wo_endl(out, pid, "open", RC, "filename:%s, flags:%s, mode:0%03llo",
-                                                             read_proc_c_string_quoted(pid, (long long)ARG0).c_str(),
+                                                             read_proc_c_string_quoted(pid, ARG0).c_str(),
                                                              o_flags2string(ARG1).c_str(),
                                                              ARG2);
                                         (out) << "; path:";
@@ -662,7 +748,8 @@ main(int argc, char *argv[], char *env[]) {
                                 break;
                             case SYS_bind:
                                 if (p.dumping_fd(ARG0))
-                                    dump_syscall(out, pid, "bind", RC, "fd:%lld", ARG0);
+                                    dump_syscall(out, pid, "bind", RC, "fd:%lld, addr:%s",
+                                                 ARG0, read_proc_sockaddr(pid, ARG1, ARG2).c_str());
                                 break;
                             case SYS_listen:
                                 if (p.dumping_fd(ARG0))
@@ -775,7 +862,8 @@ main(int argc, char *argv[], char *env[]) {
                                 break;
                             case SYS_connect:
                                 if (p.dumping_fd(ARG0))
-                                    dump_syscall(out, pid, "connect", RC, "fd:%lld", ARG0);
+                                    dump_syscall(out, pid, "connect", RC, "fd:%lld, addr:%s",
+                                                 ARG0, read_proc_sockaddr(pid, ARG1, ARG2).c_str());
                                 break;
                             case SYS_accept:
                                 p.close_fd(RC);

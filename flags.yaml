@@ -38,3 +38,101 @@ groups:
       - O_TMPFILE
       - O_TRUNC
 
+
+
+  af:
+    exclusive:
+      - flags:
+          - AF_UNSPEC
+          - AF_LOCAL
+          - AF_INET
+          - AF_AX25
+          - AF_IPX
+          - AF_APPLETALK
+          - AF_NETROM
+          - AF_BRIDGE
+          - AF_ATMPVC
+          - AF_X25
+          - AF_INET6
+          - AF_ROSE
+          - AF_DECnet
+          - AF_NETBEUI
+          - AF_SECURITY
+          - AF_KEY
+          - AF_NETLINK
+          - AF_PACKET
+          - AF_ASH
+          - AF_ECONET
+          - AF_ATMSVC
+          - AF_RDS
+          - AF_SNA
+          - AF_IRDA
+          - AF_PPPOX
+          - AF_WANPIPE
+          - AF_LLC
+          - AF_IB
+          - AF_MPLS
+          - AF_CAN
+          - AF_TIPC
+          - AF_BLUETOOTH
+          - AF_IUCV
+          - AF_RXRPC
+          - AF_ISDN
+          - AF_PHONET
+          - AF_IEEE802154
+          - AF_CAIF
+          - AF_ALG
+          - AF_NFC
+          - AF_VSOCK
+          - AF_KCM
+          - AF_QIPCRTR
+          - AF_SMC
+          - AF_MAX
+  pf:
+    exclusive:
+      - flags:
+          - PF_UNSPEC
+          - PF_LOCAL
+          - PF_INET
+          - PF_AX25
+          - PF_IPX
+          - PF_APPLETALK
+          - PF_NETROM
+          - PF_BRIDGE
+          - PF_ATMPVC
+          - PF_X25
+          - PF_INET6
+          - PF_ROSE
+          - PF_DECnet
+          - PF_NETBEUI
+          - PF_SECURITY
+          - PF_KEY
+          - PF_NETLINK
+          - PF_PACKET
+          - PF_ASH
+          - PF_ECONET
+          - PF_ATMSVC
+          - PF_RDS
+          - PF_SNA
+          - PF_IRDA
+          - PF_PPPOX
+          - PF_WANPIPE
+          - PF_LLC
+          - PF_IB
+          - PF_MPLS
+          - PF_CAN
+          - PF_TIPC
+          - PF_BLUETOOTH
+          - PF_IUCV
+          - PF_RXRPC
+          - PF_ISDN
+          - PF_PHONET
+          - PF_IEEE802154
+          - PF_CAIF
+          - PF_ALG
+          - PF_NFC
+          - PF_VSOCK
+          - PF_KCM
+          - PF_QIPCRTR
+          - PF_SMC
+          - PF_MAX
