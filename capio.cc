@@ -732,9 +732,9 @@ main(int argc, char *argv[], char *env[]) {
                                                              read_proc_c_string_quoted(pid, ARG0).c_str(),
                                                              o_flags2string(ARG1).c_str(),
                                                              ARG2);
-                                        (out) << "; path:";
+                                        out << "; path:";
                                         put_quoted(out, p.fd_path(RC));
-                                        (out) << endl;
+                                        out << endl;
                                     }
                                 }
                                 break;
@@ -820,11 +820,11 @@ main(int argc, char *argv[], char *env[]) {
                                     read_proc_struct(pid, (long long)ARG0, sizeof(filedes), filedes);
                                     if (p.dumping_fd(filedes[0]) || p.dumping_fd(filedes[1])) {
                                         dump_syscall_wo_endl(out, pid, "pipe", RC, "fds:[%d, %d]", filedes[0], filedes[1]);
-                                        (out) << "; paths:[";
+                                        out << "; paths:[";
                                         put_quoted(out, p.fd_path(filedes[0]));
-                                        (out) << ", ";
+                                        out << ", ";
                                         put_quoted(out, p.fd_path(filedes[1]));
-                                        (out) << "]" << endl;
+                                        out << "]" << endl;
                                     }
                                 }
                                 break;
@@ -834,11 +834,11 @@ main(int argc, char *argv[], char *env[]) {
                                     read_proc_struct(pid, (long long)ARG3, sizeof(usockvec), usockvec);
                                     if (p.dumping_fd(usockvec[0]) || p.dumping_fd(usockvec[1])) {
                                         dump_syscall_wo_endl(out, pid, "socketpair", RC, "fds:[%d, %d]", usockvec[0], usockvec[1]);
-                                        (out) << "; paths:[";
+                                        out << "; paths:[";
                                         put_quoted(out, p.fd_path(usockvec[0]));
-                                        (out) << ", ";
+                                        out << ", ";
                                         put_quoted(out, p.fd_path(usockvec[1]));
-                                        (out) << "]" << endl;
+                                        out << "]" << endl;
                                     }
                                 }
                                 break;
@@ -849,8 +849,12 @@ main(int argc, char *argv[], char *env[]) {
                                                  ARG0, ARG1, ARG2);
                                 break;
                             case SYS_socket:
-                                if (p.dumping_fd(RC))
-                                    dump_syscall(out, pid, "socket", RC, "");
+                                if (p.dumping_fd(RC)) {
+                                    dump_syscall_wo_endl(out, pid, "socket", RC, "");
+                                    out << "; path:";
+                                    put_quoted(out, p.fd_path(RC));
+                                    out << endl;
+                                }
                                 break;
                             case SYS_connect:
                                 if (p.dumping_fd(ARG0))
@@ -872,9 +876,9 @@ main(int argc, char *argv[], char *env[]) {
                                 if (quiet && p.dumping || was_dumping)  {
                                     // sys_execve	const char *filename	const char *const argv[]	const char *const envp[]
                                     dump_syscall_wo_endl(out, pid, "execve", RC, "%s", p.enter_args.c_str());
-                                    (out) << "; path:";
+                                    out << "; path:";
                                     put_quoted(out, p.process_name);
-                                    (out) << endl;
+                                    out << endl;
                                 }
                                 break;
                             }
@@ -995,7 +999,7 @@ main(int argc, char *argv[], char *env[]) {
                                 break;
                             default:
                                 //if (!quiet && p.dumping && p.dumping_fd(ARG0)) 
-                                //    (out) << "#" << pid << " __ unsupported system call__(" << OP << ") = " << RC << endl << flush;
+                                //    out << "#" << pid << " __ unsupported system call__(" << OP << ") = " << RC << endl << flush;
                                 debug(1, "syscall %d!", OP);
                                 break;
                             }
