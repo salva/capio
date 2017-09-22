@@ -1,0 +1,14 @@
+headers:
+  - sys/types.h
+  - sys/socket.h
+groups:
+  msg:
+    - MSG_CONFIRM
+    - MSG_DONTROUTE
+    - MSG_DONTWAIT
+    - MSG_EOR
+    - MSG_MORE
+    - MSG_NOSIGNAL
+    - MSG_OOB
+
+  
