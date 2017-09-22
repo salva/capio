@@ -526,11 +526,10 @@ dump_syscall_argsv(ostream &out, const char *fmt, va_list args) {
 
 static void
 dump_syscall_end(ostream &out, long long rc) {
-    out << " = ";
     if (rc < 0)
         out << " = -1, errno:" << e_flags2string(-rc);
     else
-        out << rc;
+        out << " = " << rc;
 }
 
 static void
