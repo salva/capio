@@ -38,8 +38,6 @@ groups:
       - O_TMPFILE
       - O_TRUNC
 
-
-
   af:
     exclusive:
       - flags:
@@ -236,3 +234,16 @@ groups:
           - ENOTRECOVERABLE
           - ERFKILL
           - EHWPOISON
+
+  sock:
+    exclusive:
+      - flags:
+          - SOCK_STREAM
+          - SOCK_DGRAM
+          - SOCK_SEQPACKET
+          - SOCK_RAW
+          - SOCK_RDM
+          - SOCK_PACKET
+    flags:
+      - SOCK_NONBLOCK
+      - SOCK_CLOEXEC

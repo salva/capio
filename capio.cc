@@ -25,6 +25,8 @@ using namespace std;
 
 #include "capio.h"
 #include "flags.h"
+#include "sockaddr.h"
+#include "util.h"
 
 static int debug_level = 0;
 static unordered_map<int, bool> dumping_fds;
@@ -215,60 +217,6 @@ static void dump_hex(ostream &out, bool writting, const unsigned char *data, siz
 }
 
 static void
-put_quoted(ostream &out, const unsigned char *data, size_t len, bool breaks = false, string prefix = "", string quote = "\"") {
-    out << prefix << quote;
-    for (size_t i = 0; i < len; i++) {
-        int c = data[i];
-        switch(c) {
-        case '\0':
-            out << "\\0";
-            break;
-        case '\a':
-            out << "\\a";
-            break;
-        case '\b':
-            out << "\\b";
-            break;
-        case '\t':
-            out << "\\t";
-            break;
-        case '\n':
-            out << "\\n";
-            if (breaks && (len - i > 1))
-                out << quote << endl << prefix << quote;
-            break;
-        case '\v':
-            out << "\\v";
-            break;
-        case '\f':
-            out << "\\f";
-            break;
-        case '\r':
-            out << "\\r";
-            break;
-        case '\\':
-            out << "\\\\";
-            break;
-        default:
-            if (isprint(c)) {
-                out.put(c);
-            }
-            else {
-                char hex[10];
-                sprintf(hex, "\\x%02x", c);
-                out << hex;
-            }
-        }
-    }
-    out << quote;
-}
-
-static void
-put_quoted(ostream &out, const string &str, bool breaks = false, string prefix = "", string quote = "\"") {
-    put_quoted(out, (const unsigned char*)str.c_str(), str.length(), breaks, prefix, quote);
-}
-
-static void
 dump_quoted(ostream &out, bool writting, const unsigned char *data, size_t len, bool breaks) {
     if (len) {
         put_quoted(out, data, len, breaks, (writting ? "> " : "< "));
@@ -378,20 +326,6 @@ read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen = 16384) {
     return "NULL";
 }
 
-static string
-chars2hex(const unsigned char *s, size_t len) {
-    if (s) {
-        stringstream ss;
-        for (int i = 0; i < len; i++) {
-            char buffer[4];
-            sprintf(buffer, "%02x", s[i]);
-            ss << buffer;
-        }
-        return ss.str();
-    }
-    return "*NULL*";
-}
-
 size_t round_up_len(size_t len) {
     return ((len + sizeof(long) - 1) & ~(sizeof(long) - 1));
 }
@@ -399,54 +333,12 @@ size_t round_up_len(size_t len) {
 static string
 read_proc_sockaddr(pid_t pid, long long mem, size_t len) {
     if (mem) {
-        stringstream ss;
-        size_t rlen = round_up_len(len);
-        const unsigned char *data = read_proc_mem(pid, mem, rlen);
-        ss << "{[len:" << len << ", rlen:" << rlen << "]";
-        if (len < sizeof(sa_family_t)) {
-            ss << ", invalid:" << chars2hex(data, len);
-        }
-        else {
-            auto addr = (const struct sockaddr *)data;
-            sa_family_t af = addr->sa_family;
-            ss << ", sa_family:" << af_flags2string(af);
-            switch(af) {
-            case AF_NETLINK:
-                if (len < sizeof(struct sockaddr_nl)) goto invalid;
-                else {
-                    auto addr_nl = (const struct sockaddr_nl*)addr;
-                    ss << ", pad:" << addr_nl->nl_pad
-                       << ", pid:" << addr_nl->nl_pid
-                       << ", groups:" << addr_nl->nl_groups;
-                }
-                break;
-            case AF_LOCAL:
-                if (len < sizeof(struct sockaddr_un)) goto invalid;
-                else {
-                    auto addr_un = (const struct sockaddr_un*)addr;
-                    ss << ", path:";
-                    put_quoted(ss, addr_un->sun_path,
-                               strnlen(addr_un->sun_path, UNIX_PATH_MAX));
-                }
-                break;
-            case AF_INET:
-                if (len < sizeof(struct sockaddr_in)) goto invalid;
-                else {
-                    auto addr_in = (const struct sockaddr_in*)addr;
-                    ss << ", port:" << ntohs(addr_in->sin_port)
-                       << ", addr:" << inet_ntoa(addr_in->sin_addr);
-                }
-                break;
-            default:
-            invalid:
-                ss << ", invalid:" << chars2hex(data, len);
-                    break;
-            }
-        }
-        ss << "}";
-        return ss.str();
+        auto data = (struct sockaddr *)read_proc_mem(pid, mem, len);
+        return sockaddr2string(data, len);
     }
-    return "NULL";
+    else {
+        return "NULL";
+    }
 }
 
 static string
@@ -833,7 +725,12 @@ main(int argc, char *argv[], char *env[]) {
                                     int usockvec[2];
                                     read_proc_struct(pid, (long long)ARG3, sizeof(usockvec), usockvec);
                                     if (p.dumping_fd(usockvec[0]) || p.dumping_fd(usockvec[1])) {
-                                        dump_syscall_wo_endl(out, pid, "socketpair", RC, "fds:[%d, %d]", usockvec[0], usockvec[1]);
+                                        dump_syscall_wo_endl(out, pid, "socketpair", RC,
+                                                             "domain:%s, type:%s, protocol:%lld fds:[%d, %d]",
+                                                             af_flags2string(ARG0).c_str(),
+                                                             sock_flags2string(ARG1).c_str(),
+                                                             ARG2,
+                                                             usockvec[0], usockvec[1]);
                                         out << "; paths:[";
                                         put_quoted(out, p.fd_path(usockvec[0]));
                                         out << ", ";
@@ -850,7 +747,10 @@ main(int argc, char *argv[], char *env[]) {
                                 break;
                             case SYS_socket:
                                 if (p.dumping_fd(RC)) {
-                                    dump_syscall_wo_endl(out, pid, "socket", RC, "");
+                                    dump_syscall_wo_endl(out, pid, "socket", RC, "domain:%s, type:%s, protocol:%lld",
+                                                         af_flags2string(ARG0).c_str(),
+                                                         sock_flags2string(ARG1).c_str(),
+                                                         ARG2);
                                     out << "; path:";
                                     put_quoted(out, p.fd_path(RC));
                                     out << endl;
@@ -864,7 +764,9 @@ main(int argc, char *argv[], char *env[]) {
                             case SYS_accept:
                                 p.close_fd(RC);
                                 if (p.dumping_fd(ARG0) || p.dumping_fd(RC))
-                                    dump_syscall(out, pid, "accept", RC, "fd:%lld", ARG0);
+                                    dump_syscall(out, pid, "accept", RC, "fd:%lld, addr:%s",
+                                                 ARG0,
+                                                 read_proc_sockaddr(pid, ARG1, ARG2).c_str());
                                 break;
                             case SYS_clone:
                                 if (p.dumping)
