@@ -8,6 +8,8 @@ headers:
   - sys/file.h
   - sys/inotify.h
   - sys/xattr.h
+  - sys/uio.h
+  - linux/fs.h
 groups:
   msg:
     flags:
@@ -369,3 +371,16 @@ groups:
       - SPLICE_F_NONBLOCK
       - SPLICE_F_MORE
       - SPLICE_F_GIFT
+
+  shut:
+    exclusive:
+      - flags:
+          - SHUT_RD
+          - SHUT_WR
+          - SHUT_RDWR
+
+  rwf:
+    flags:
+      - RWF_DSYNC
+      - RWF_HIPRI
+      - RWF_SYNC

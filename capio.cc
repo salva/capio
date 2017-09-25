@@ -447,6 +447,24 @@ dump_syscall(ostream &out, pid_t pid, const char *name, long long rc, const char
     }
 }
 
+static void
+dump_iov(dual_ostream &out, Process &p, int fd, const char *syscall_name,
+         long long rc, bool writting, long long mem, long long len) {
+    size_t remaining = rc;
+    auto vec = (struct iovec *)mem;
+    for (size_t i = 0; remaining && i < len; i++) {
+        struct iovec iov;
+        read_proc_struct(p.pid, (long long)(vec + i), sizeof(iov), &iov);
+        size_t chunk = ((remaining > iov.iov_len) ? iov.iov_len : remaining);
+        dump_mem(out, format, writting, p.pid, (long long)iov.iov_base, chunk);
+#ifdef WITH_PERL
+        if (perl_flag)
+            dump_perl(out, p, fd, syscall_name, rc, writting, (long long)iov.iov_base, chunk);
+#endif
+        remaining -= chunk;
+    }
+}
+
 int
 main(int argc, char *argv[], char *env[]) {
 #ifdef WITH_PERL
@@ -654,23 +672,13 @@ main(int argc, char *argv[], char *env[]) {
                                                  msg.msg_iovlen,
                                                  read_proc_string_quoted(pid, (long long)msg.msg_control,
                                                                          msg.msg_controllen).c_str());
-                                    size_t remaining = RC;
-                                    for (size_t i = 0; remaining && i < msg.msg_iovlen; i++) {
-                                        struct iovec iov;
-                                        read_proc_struct(pid, (long long)(msg.msg_iov + i), sizeof(iov), &iov);
-                                        size_t chunk = ((remaining > iov.iov_len) ? iov.iov_len : remaining);
-                                        dump_mem(out, format, writting, pid, (long long)iov.iov_base, chunk);
-#ifdef WITH_PERL
-                                        if (perl_flag)
-                                            dump_perl(out, p, ARG0, syscall_name, RC,  writting, (long long)iov.iov_base, chunk);
-#endif
-                                        remaining -= chunk;
-                                    }
+                                    dump_iov(out, p, ARG0, syscall_name, RC, writting, (long long)msg.msg_iov, msg.msg_iovlen);
                                 }
                                 break;
                             case SYS_shutdown:
                                 if (p.dumping_fd(ARG0))
-                                    dump_syscall(out, pid, "shutdown", RC, "fd:%lld, how:%lld", ARG0, ARG1);
+                                    dump_syscall(out, pid, "shutdown", RC, "fd:%lld, how:%s", ARG0,
+                                                 shut_flags2string(ARG1).c_str());
                                 break;
                             case SYS_pwrite64:
                                 writting = true;
@@ -685,25 +693,36 @@ main(int argc, char *argv[], char *env[]) {
 #endif
                                 }
                                 break;
+                            case SYS_pwritev:
+                                writting = 1;
+                            case SYS_preadv:
+                                if (p.dumping_fd(ARG0)) {
+                                    const char *syscall_name = (writting ? "pwritev" : "preadv");
+                                    dump_syscall(out, pid, syscall_name, RC,
+                                                 "fd:%lld, pos:%lld (l:%lld, h:%ldd)",
+                                                 ARG0, ARG3 + (ARG4 << 32), ARG3, ARG4);
+                                    dump_iov(out, p, ARG0, syscall_name, RC, writting, ARG1, ARG2);
+                                }
+                                break;
+                            case SYS_pwritev2:
+                                writting = true;
+                            case SYS_preadv2:
+                                if (p.dumping_fd(ARG0)) {
+                                    const char *syscall_name = (writting ? "pwritev" : "preadv");
+                                    dump_syscall(out, pid, syscall_name, RC,
+                                                 "fd:%lld, pos:%lld (l:%lld, h:%ldd), flags:%s",
+                                                 ARG0, ARG3 + (ARG4 << 32), ARG3, ARG4,
+                                                 rwf_flags2string(ARG5).c_str());
+                                    dump_iov(out, p, ARG0, syscall_name, RC, writting, ARG1, ARG2);
+                                }
+                                break;
                             case SYS_writev:
                                 writting = 1;
                             case SYS_readv:
                                 if (p.dumping_fd(ARG0)) {
                                     const char *syscall_name = (writting ? "writev" : "readv");
                                     dump_syscall(out, pid, syscall_name, RC, "fd:%lld", ARG0);
-                                    size_t remaining = RC;
-                                    struct iovec *vec = (struct iovec *)ARG2;
-                                    for (size_t i = 0; remaining && i < ARG3; i++) {
-                                        struct iovec iov;
-                                        read_proc_struct(pid, (long long)(vec + i), sizeof(iov), &iov);
-                                        size_t chunk = ((remaining > iov.iov_len) ? iov.iov_len : remaining);
-                                        dump_mem(out, format, writting, pid, (long long)iov.iov_base, chunk);
-#ifdef WITH_PERL
-                                        if (perl_flag)
-                                            dump_perl(out, p, ARG0, syscall_name, RC, writting, (long long)iov.iov_base, chunk);
-#endif
-                                        remaining -= chunk;
-                                    }
+                                    dump_iov(out, p, ARG0, syscall_name, RC, writting, ARG1, ARG2);
                                 }
                                 break;
                             case SYS_pipe:
@@ -711,7 +730,9 @@ main(int argc, char *argv[], char *env[]) {
                                     int filedes[2];
                                     read_proc_struct(pid, (long long)ARG0, sizeof(filedes), filedes);
                                     if (p.dumping_fd(filedes[0]) || p.dumping_fd(filedes[1])) {
-                                        dump_syscall_wo_endl(out, pid, "pipe", RC, "fds:[%d, %d]", filedes[0], filedes[1]);
+                                        dump_syscall_wo_endl(out, pid, "pipe", RC, "fds:[%d, %d], flags:%s",
+                                                             filedes[0], filedes[1],
+                                                             o_flags2string(ARG1).c_str());
                                         out << "; paths:[";
                                         put_quoted(out, p.fd_path(filedes[0]));
                                         out << ", ";
