@@ -27,3 +27,4 @@ flags.cc: flags.pl flags.yaml
 capio.1: capio.pod
 	pod2man -center "General Commands Manual" -section 1 capio.pod >capio.1
 
+*.cc: $(H_FILES)
