@@ -2,7 +2,12 @@ headers:
   - sys/types.h
   - sys/socket.h
   - sys/stat.h
+  - asm/mman.h
+  - sys/mman.h
   - fcntl.h
+  - sys/file.h
+  - sys/inotify.h
+  - sys/xattr.h
 groups:
   msg:
     flags:
@@ -247,3 +252,120 @@ groups:
     flags:
       - SOCK_NONBLOCK
       - SOCK_CLOEXEC
+
+  clone:
+    flags:
+      - CLONE_CHILD_CLEARTID
+      - CLONE_CHILD_SETTID
+      - CLONE_FILES
+      - CLONE_FS
+      - CLONE_IO
+      - CLONE_NEWCGROUP
+
+      - CLONE_NEWIPC
+      - CLONE_NEWNET
+      - CLONE_NEWNS
+      - CLONE_NEWPID
+      - CLONE_NEWUSER
+      - CLONE_NEWUTS
+      - CLONE_PARENT
+      - CLONE_PARENT_SETTID
+      - CLONE_PTRACE
+      - CLONE_SETTLS
+      - CLONE_SETTLS
+      - CLONE_SIGHAND
+      - CLONE_SYSVSEM
+      - CLONE_THREAD
+      - CLONE_UNTRACED
+      - CLONE_VFORK
+      - CLONE_VM
+
+  prot:
+    flags:
+      - PROT_EXEC
+      - PROT_READ
+      - PROT_WRITE
+      - PROT_NONE
+  map:
+    exclusive:
+      - flags:
+          - MAP_SHARED
+          - MAP_PRIVATE
+    flags:
+      - MAP_32BIT
+      - MAP_ANONYMOUS
+      - MAP_DENYWRITE
+      - MAP_EXECUTABLE
+      - MAP_FILE
+      - MAP_FIXED
+      - MAP_GROWSDOWN
+      - MAP_HUGETLB
+      - MAP_HUGE_2MB
+      - MAP_HUGE_1GB
+      - MAP_LOCKED
+      - MAP_NONBLOCK
+      - MAP_NORESERVE
+      - MAP_POPULATE
+      - MAP_STACK
+      - MAP_UNINITIALIZED
+
+  lock:
+    exclusive:
+      - flags:
+          - LOCK_SH
+          - LOCK_EX
+          - LOCK_UN
+    flags:
+      - LOCK_NB
+
+  xattr:
+    exclusive:
+      - flags:
+          - XATTR_CREATE
+          - XATTR_REPLACE
+
+  posix_fadvise:
+    exclusive:
+      - flags:
+          - POSIX_FADV_NORMAL
+          - POSIX_FADV_SEQUENTIAL
+          - POSIX_FADV_RANDOM
+          - POSIX_FADV_NOREUSE
+          - POSIX_FADV_WILLNEED
+          - POSIX_FADV_DONTNEED
+
+  in_init1:
+    flags:
+      - IN_NONBLOCK
+      - IN_CLOEXEC
+
+  in:
+    flags:
+      - IN_ACCESS
+      - IN_MODIFY
+      - IN_ATTRIB
+      - IN_CLOSE_WRITE
+      - IN_CLOSE_NOWRITE
+      - IN_OPEN
+      - IN_MOVED_FROM
+      - IN_MOVED_TO
+      - IN_CREATE
+      - IN_DELETE
+      - IN_DELETE_SELF
+      - IN_MOVE_SELF
+      - IN_UNMOUNT
+      - IN_Q_OVERFLOW
+      - IN_IGNORED
+      - IN_ONLYDIR
+      - IN_DONT_FOLLOW
+      - IN_EXCL_UNLINK
+      - IN_MASK_ADD
+      - IN_ISDIR
+      - IN_ONESHOT
+
+  splice:
+    flags:
+      - SPLICE_F_MOVE
+      - SPLICE_F_NONBLOCK
+      - SPLICE_F_MORE
+      - SPLICE_F_GIFT

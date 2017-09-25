@@ -17,7 +17,7 @@ my $id = 1;
 
 my $data = YAML::LoadFile($from) or die "invalid data in YAML file $from";
 
-$debug and warn Dumper($data) ."\n";
+#$debug and warn Dumper($data) ."\n";
 
 open my $out_cc, '>', $to_cc or die "$to_cc: $!";
 open my $out_h, '>', $to_h or die "$to_h: $!";
