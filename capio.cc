@@ -789,6 +789,14 @@ main(int argc, char *argv[], char *env[]) {
                                                  ARG0,
                                                  read_proc_sockaddr(pid, ARG1, ARG2).c_str());
                                 break;
+                            case SYS_accept4:
+                                p.close_fd(RC);
+                                if (p.dumping_fd(ARG0) || p.dumping_fd(RC))
+                                    dump_syscall(out, pid, "accept", RC, "fd:%lld, addr:%s, flags:%s",
+                                                 ARG0,
+                                                 read_proc_sockaddr(pid, ARG1, ARG2).c_str(),
+                                                 sock_flags2string(ARG3).c_str());
+                                break;
                             case SYS_clone:
                                 if (p.dumping)
                                     dump_syscall(out, pid, "clone", RC, "");
@@ -818,7 +826,8 @@ main(int argc, char *argv[], char *env[]) {
                             case SYS_dup3:
                                 p.dup_fd(ARG0, ARG1);
                                 if (p.dumping_fd(ARG0) || p.dumping_fd(RC))
-                                    dump_syscall(out, pid, "dup3", RC, "oldfd:%lld, newfd:%lld", ARG0, ARG1);
+                                    dump_syscall(out, pid, "dup3", RC, "oldfd:%lld, newfd:%lld, flags:%s",
+                                                 ARG0, ARG1, o_flags2string(ARG2).c_str());
                                 break;
                             case SYS_close:
                                 if (p.dumping_fd(ARG0))
