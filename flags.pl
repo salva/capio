@@ -13,6 +13,8 @@ my $from = shift // 'flags.yaml';
 my $to_cc = shift // $from =~ s/(:?\.yaml)?$/.cc/r;
 my $to_h = shift // $to_cc =~ s/(:?\.cc)?$/.h/r;
 
+my $id = 1;
+
 my $data = YAML::LoadFile($from) or die "invalid data in YAML file $from";
 
 $debug and warn Dumper($data) ."\n";
@@ -50,11 +52,34 @@ EOCC
     if ($exclusive) {
         for my $exc (@$exclusive) {
             my $flags = $exc->{flags};
-            my $mask = $exc->{mask} // join('|', @$flags);
+            my $mask_var = "mask".$id++;
+            print $out_cc "    long long $mask_var = 0";
             for my $flag (@$flags) {
+                my ($f, $opt) = $flag =~ /(.*?)(\?)?$/;
+                if ($opt) {
+                    print $out_cc <<EOCC;
+
+#ifdef $f
+|$f
+#endif
+EOCC
+                } else {
+                    print $out_cc "|$f";
+                }
+            }
+            print $out_cc ";\n";
+
+            for my $flag (@$flags) {
+                my ($f, $opt) = $flag =~ /(.*?)(\?)?$/;
+                print $out_cc <<EOCC if $opt;
+#ifdef $f
+EOCC
                 print $out_cc <<EOCC;
-    if ((flags & ($mask)) == $flag)
-        s += "$flag|";
+    if ((flags & ($mask_var)) == $f)
+        s += "$f|";
+EOCC
+                print $out_cc <<EOCC if $opt;
+#endif
 EOCC
             }
         }
@@ -62,15 +87,22 @@ EOCC
     my $flags = $groups->{$name}{flags};
     if ($flags) {
         for my $flag (@$flags) {
+            my ($f, $opt) = $flag =~ /(.*?)(\?)?$/;
+            print $out_cc <<EOCC if $opt;
+#ifdef $f
+EOCC
             print $out_cc <<EOCC;
-    if ($flag == 0) {
+    if ($f == 0) {
         if (flags == 0)
-            s += "$flag|";
+            s += "$f|";
     }
     else {
-        if ((flags & $flag) == $flag)
-            s += "$flag|";
+        if ((flags & $f) == $f)
+            s += "$f|";
     }
+EOCC
+            print $out_cc <<EOCC if $opt;
+#endif
 EOCC
         }
     }

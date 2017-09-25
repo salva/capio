@@ -83,8 +83,8 @@ groups:
           - AF_NFC
           - AF_VSOCK
           - AF_KCM
-          - AF_QIPCRTR
-          - AF_SMC
+          - AF_QIPCRTR?
+          - AF_SMC?
           - AF_MAX
   pf:
     exclusive:
@@ -131,8 +131,8 @@ groups:
           - PF_NFC
           - PF_VSOCK
           - PF_KCM
-          - PF_QIPCRTR
-          - PF_SMC
+          - PF_QIPCRTR?
+          - PF_SMC?
           - PF_MAX
   e:
     exclusive:
