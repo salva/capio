@@ -837,12 +837,17 @@ main(int argc, char *argv[], char *env[]) {
                             case SYS_mmap:
                                 if (ARG4 >= 0) {
                                     if (p.dumping_fd(ARG4))
-                                        dump_syscall(out, pid, "mmap", RC, "fd:%lld", ARG4);
+                                        dump_syscall(out, pid, "mmap", RC,
+                                                     "addr:0xllx, length:%lld, prot:%s, flags:%s, fd:%lld, offset:%lld",
+                                                     ARG0, ARG1,
+                                                     prot_flags2string(ARG2).c_str(),
+                                                     map_flags2string(ARG3).c_str(), ARG4, ARG5);
                                 }
                                 break;
                             case SYS_flock:
                                 if (p.dumping_fd(ARG0))
-                                    dump_syscall(out, pid, "flock", RC, "fd:%lld, cmd:%lld", ARG0, ARG1);
+                                    dump_syscall(out, pid, "flock", RC, "fd:%lld, operation:%s", ARG0,
+                                                 lock_flags2string(ARG1).c_str());
                                 break;
                             case SYS_fsync:
                                 if (p.dumping_fd(ARG0))
@@ -898,16 +903,25 @@ main(int argc, char *argv[], char *env[]) {
                                 break;
                             case SYS_fadvise64:
                                 if (p.dumping_fd(ARG0))
-                                    dump_syscall(out, pid, "fadvise64", RC, "fd:%lld, offset:%lld, len:%lld, advice:%ldd",
-                                                 ARG0, ARG1, ARG2, ARG3);
+                                    dump_syscall(out, pid, "fadvise64", RC, "fd:%lld, offset:%lld, len:%lld, advice:%s",
+                                                 ARG0, ARG1, ARG2,
+                                                 posix_fadv_flags2string(ARG3).c_str());
                                 break;
                             case SYS_inotify_init:
                                 if (p.dumping_fd(RC))
                                     dump_syscall(out, pid, "inotify_init", RC, "");
                                 break;
+                            case SYS_inotify_init1:
+                                if (p.dumping_fd(RC))
+                                    dump_syscall(out, pid, "inotify_init1", RC, "flags:%s",
+                                                 in_init1_flags2string(ARG0).c_str());
+                                break;
                             case SYS_inotify_add_watch:
                                  if (p.dumping_fd(ARG0))
-                                     dump_syscall(out, pid, "inotify_add_watch", RC, "fd:%lld, ..., mask:%lld", ARG0, ARG2);
+                                     dump_syscall(out, pid, "inotify_add_watch", RC, "fd:%lld, path:%s, mask:%s",
+                                                  ARG0,
+                                                  read_proc_c_string_quoted(pid, ARG1).c_str(),
+                                                  in_flags2string(ARG2).c_str());
                                  break;
                             case SYS_inotify_rm_watch:
                                 if (p.dumping_fd(ARG0))
@@ -916,18 +930,24 @@ main(int argc, char *argv[], char *env[]) {
                             case SYS_openat:
                                 p.close_fd(RC);
                                 if (p.dumping_fd(ARG0) || p.dumping_fd(RC))
-                                    dump_syscall(out, pid, "openat", RC, "dfd:%lld, ..., flags:%ldd, mode:%ldd",
-                                                 ARG0, ARG2, ARG3);
+                                    dump_syscall(out, pid, "openat", RC, "dfd:%lld, path:%s, flags:%s, mode:0%03llo",
+                                                 ARG0,
+                                                 read_proc_c_string_quoted(pid, ARG1).c_str(),
+                                                 o_flags2string(ARG2).c_str(),
+                                                 ARG3);
                                  break;
                             case SYS_splice:
                                 if (p.dumping_fd(ARG0) || p.dumping_fd(ARG2))
-                                    dump_syscall(out, pid, "splice", RC, "fd_in:%lld, ..., fd_out:%lld, len:%lld, flags:%lld",
-                                                 ARG0, ARG2, ARG4, ARG5);
+                                    dump_syscall(out, pid, "splice", RC,
+                                                 "fd_in:%lld, ..., fd_out:%lld, ..., len:%lld, flags:%s",
+                                                 ARG0, ARG2, ARG4,
+                                                 splice_flags2string(ARG5).c_str());
                                 break;
                             case SYS_tee:
                                 if (p.dumping_fd(ARG0) || p.dumping_fd(ARG1))
-                                    dump_syscall(out, pid, "tee", RC, "fdin:%lld, fdout:%lld, len:%lld, flags:%lld",
-                                                 ARG0, ARG1, ARG2, ARG3);
+                                    dump_syscall(out, pid, "tee", RC, "fdin:%lld, fdout:%lld, len:%lld, flags:%s",
+                                                 ARG0, ARG1, ARG2,
+                                                 splice_flags2string(ARG3).c_str());
                                 break;
                             default:
                                 //if (!quiet && p.dumping && p.dumping_fd(ARG0)) 

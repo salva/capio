@@ -326,7 +326,7 @@ groups:
           - XATTR_CREATE
           - XATTR_REPLACE
 
-  posix_fadvise:
+  posix_fadv:
     exclusive:
       - flags:
           - POSIX_FADV_NORMAL
