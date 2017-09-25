@@ -838,7 +838,7 @@ main(int argc, char *argv[], char *env[]) {
                                 if (ARG4 >= 0) {
                                     if (p.dumping_fd(ARG4))
                                         dump_syscall(out, pid, "mmap", RC,
-                                                     "addr:0xllx, length:%lld, prot:%s, flags:%s, fd:%lld, offset:%lld",
+                                                     "addr:0x%llx, length:%lld, prot:%s, flags:%s, fd:%lld, offset:%lld",
                                                      ARG0, ARG1,
                                                      prot_flags2string(ARG2).c_str(),
                                                      map_flags2string(ARG3).c_str(), ARG4, ARG5);
