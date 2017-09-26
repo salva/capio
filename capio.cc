@@ -342,6 +342,15 @@ read_proc_sockaddr(pid_t pid, long long mem, size_t len) {
 }
 
 static string
+read_proc_off_t(pid_t pid, long long mem) {
+    if (mem) {
+        auto data = (const off_t *)read_proc_mem(pid, mem, sizeof(off_t));
+        return to_string(*data);
+    }
+    return "NULL";
+}
+
+static string
 read_proc_array_c_string_quoted(pid_t pid, long long mem) {
     if (mem) {
         stringstream ss;
@@ -939,8 +948,12 @@ main(int argc, char *argv[], char *env[]) {
                             case SYS_splice:
                                 if (p.dumping_fd(ARG0) || p.dumping_fd(ARG2))
                                     dump_syscall(out, pid, "splice", RC,
-                                                 "fd_in:%lld, ..., fd_out:%lld, ..., len:%lld, flags:%s",
-                                                 ARG0, ARG2, ARG4,
+                                                 "fd_in:%lld, off_in:%s, fd_out:%lld, off_out:%s, len:%lld, flags:%s",
+                                                 ARG0,
+                                                 read_proc_off_t(pid, ARG1).c_str(),
+                                                 ARG2,
+                                                 read_proc_off_t(pid, ARG3).c_str(),
+                                                 ARG4,
                                                  splice_flags2string(ARG5).c_str());
                                 break;
                             case SYS_tee:
