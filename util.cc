@@ -73,3 +73,33 @@ put_quoted(ostream &out, const string &str, bool breaks, string prefix, string q
     put_quoted(out, (const unsigned char*)str.c_str(), str.length(), breaks, prefix, quote);
 }
 
+static inline void
+ltrim(std::string &s) {
+    s.erase(s.begin(),
+            std::find_if(s.begin(), s.end(),
+                         [](int ch) { return !std::isspace(ch); } ) );
+}
+
+static inline void
+rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(),
+                         [](int ch) { return !std::isspace(ch); } ).base(), s.end());
+}
+
+// trim from both ends (in place)
+static inline void trim(std::string &s) {
+    ltrim(s);
+    rtrim(s);
+}
+
+void
+split_and_append(vector<string> &v, const std::string &s, char delim) {
+    std::stringstream ss;
+    ss.str(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        trim(item);
+        if (item.length())
+            v.push_back(item);
+    }
+}

@@ -16,7 +16,7 @@ all: capio capio.1
 #capio: capio.cpp $(H_FILES)
 #	g++ -std=gnu++11 $(CPPFLAGS) -O0 -g capio.cpp $(LDFLAGS) -o capio
 
-capio: capio.o flags.o sockaddr.o util.o dumper.o handler.o dual_ostream.o memory.o syscall_defs.o
+capio: capio.o flags.o sockaddr.o util.o dumper.o handler.o dual_ostream.o memory.o syscall_defs.o syscall.o
 
 flags.h: helpers/flags.pl flags.yaml
 	perl ./helpers/flags.pl flags.yaml flags.cc flags.h

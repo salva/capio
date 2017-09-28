@@ -31,7 +31,7 @@ using namespace std;
 #include "regs.h"
 #include "dumper.h"
 #include "memory.h"
-
+#include "syscall.h"
 #include "handler.h"
 
 static int debug_level = 0;
@@ -195,6 +195,34 @@ dual_ostream &Capio::out(Process &p) {
 }
 
 void
+Capio::enable_group(long long tag) {
+    for (int i = 0; i <= SYSCALL_LAST; i++) {
+        if (syscalls[i].groups & tag)
+            dumping_syscalls[i] = true;
+    }
+}
+
+void
+Capio::disable_group(long long tag) {
+    for (int i = 0; i <= SYSCALL_LAST; i++) {
+        if (syscalls[i].groups & tag)
+            dumping_syscalls[i] = false;
+    }
+}
+
+void
+Capio::enable_syscall(long long op) {
+    if ((op >= 0) && (op <= SYSCALL_LAST))
+        dumping_syscalls[op] = true;
+}
+
+void
+Capio::disable_syscall(long long op) {
+    if ((op >= 0) && (op <= SYSCALL_LAST))
+        dumping_syscalls[op] = false;
+}
+
+void
 fatal(const char *msg) {
     perror(msg);
     exit(EXIT_FAILURE);
@@ -209,8 +237,9 @@ main(int argc, char *argv[], char *env[]) {
     int fd;
     pid_t pid;
     Capio capio;
+    vector<string> groups;
 
-    while ((opt = getopt(argc, argv, "o:m:M:p:n:N:l:e:E:fdqFO")) != -1) {
+    while ((opt = getopt(argc, argv, "o:m:M:p:n:N:l:e:E:s:fdqFO")) != -1) {
         switch (opt) {
         case 'p':
             pid = atol(optarg);
@@ -253,7 +282,9 @@ main(int argc, char *argv[], char *env[]) {
         case 'q':
             capio.quiet = true;
             break;
-
+        case 's':
+            split_and_append(groups, optarg);
+            break;
         case 'e':
         case 'E':
         case 'M':
@@ -273,6 +304,33 @@ main(int argc, char *argv[], char *env[]) {
             exit(EXIT_FAILURE);
         }
     }
+
+    if (groups.empty() == 0)
+        groups.push_back("%default");
+
+    for(auto const& group: groups) {
+        const char *str = group.c_str();
+        bool disable = false;
+        if (str[0] == '!') {
+            str++;
+            disable = true;
+        }
+        if (str[0] == '%') {
+            long long tag = group_lookup(str+1);
+            if (disable)
+                capio.disable_group(tag);
+            else
+                capio.enable_group(tag);
+        }
+        else {
+            long long op = syscall_lookup(str);
+            if (disable)
+                capio.disable_syscall(op);
+            else
+                capio.enable_syscall(op);
+        }
+    }
+
     capio.default_out = ((capio.out_fn && !capio.multifile)
                          ? new dual_ostream(*capio.out_fn)
                          : new dual_ostream(dup(1)));

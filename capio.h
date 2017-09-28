@@ -4,6 +4,7 @@
 #include <sys/user.h>
 
 #include "dual_ostream.h"
+#include "syscall_defs.h"
 
 void debug(int level, const char *fmt...);
 const unsigned char* read_proc_mem(pid_t pid, long long mem, size_t len);
@@ -52,11 +53,20 @@ struct Capio {
     std::string *out_fn;
     dual_ostream *default_out;
 
+    bool dumping_syscalls[SYSCALL_LAST+1];
+
     Capio() :
         format('\0'), dump_children(false), quiet(false),
         dont_follow(false), multifile(false),
-        out_fn(NULL), default_out(NULL)
-        {}
+        out_fn(NULL), default_out(NULL) {
+        memset(dumping_syscalls, 0, sizeof(dumping_syscalls));
+    }
+
+    void enable_group(long long tag);
+    void disable_group(long long tag);
+
+    void enable_syscall(long long op);
+    void disable_syscall(long long op);
 
     dual_ostream &out(Process &p);
     dual_ostream &out();

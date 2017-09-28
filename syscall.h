@@ -1,5 +1,5 @@
-
-//#include "capio.h";
+#ifndef __CAPIO_H__
+#define __CAPIO_H__
 
 struct Capio;
 struct Process;
@@ -28,6 +28,14 @@ struct syscall {
 
 extern struct syscall syscalls[];
 
+struct group {
+    const char *name;
+    long long tag;
+};
+
+extern struct group groups[];
+
+
 #define SYSCALL_UNEXPECTED 1
 #define SYSCALL_READ 2
 #define SYSCALL_WRITE 4
@@ -35,3 +43,8 @@ extern struct syscall syscalls[];
 #define SYSCALL_ABI_X32 16
 #define SYSCALL_PTREGS 32
 
+
+long long syscall_lookup(const char *name);
+long long group_lookup(const char *name);
+
+#endif

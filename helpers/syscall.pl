@@ -178,10 +178,10 @@ void $handler(Capio &c, Process &p, struct user_regs_struct &regs);
 EOH
 }
 
-print $fh_cc <<EOH;
+print $fh_cc <<EOCC;
 
 struct syscall syscalls[] = {
-EOH
+EOCC
 
 for my $n (0..$max_n) {
     if (my $sc = $syscall{$n}) {
@@ -189,25 +189,37 @@ for my $n (0..$max_n) {
         my $flags = (@f ? join '|', map "SYSCALL_".uc($_), @f : '0');
         my @g =  @{$sc->{groups}};
         my $groups = (@g ? join '|', map "GROUP_".uc($_), @g : '0');
-        print $fh_cc <<EOH;
+        print $fh_cc <<EOCC;
     { /* $n */ "$sc->{name}", $flags, $groups, $sc->{handler} },
-EOH
+EOCC
     }
     else {
-        print $fh_cc <<EOH;
+        print $fh_cc <<EOCC;
     { /* $n */ "unexpected_$n", SYSCALL_UNEXPECTED, GROUP_UNEXPECTED, &handle_syscall_unexpected, },
-EOH
+EOCC
     }
 }
 
-print $fh_cc <<EOH;
+print $fh_cc <<EOCC;
 };
 
-EOH
+struct group groups[] = {
+EOCC
 
+for my $gr (sort keys %group) {
+    my $tag = 'GROUP_'.uc $gr;
+    print $fh_cc <<EOCC;
+    { "$gr", $tag, },
+EOCC
+}
+
+print $fh_cc <<EOCC;
+    { 0, 0, },
+};
+
+EOCC
 
 if ($make_handler) {
-
     open my $fh_handler_cc, '>', "$out_handler_cc.tmpl" or die "$out_handler_cc.tmpl: $!";
 
     print $fh_handler_cc <<EOCC;
