@@ -18,11 +18,17 @@ all: capio capio.1
 
 capio: capio.o flags.o sockaddr.o util.o syscall.o dumper.o dual_ostream.o memory.o
 
-flags.h: flags.pl flags.yaml
-	perl ./flags.pl flags.yaml flags.cc flags.h
+flags.h: helpers/flags.pl flags.yaml
+	perl ./helpers/flags.pl flags.yaml flags.cc flags.h
 
-flags.cc: flags.pl flags.yaml
-	perl ./flags.pl flags.yaml flags.cc flags.h
+flags.cc: helpers/flags.pl flags.yaml
+	perl ./helpers/flags.pl flags.yaml flags.cc flags.h
+
+syscall.h: helpers/syscall.pl docs/syscall_64.tbl
+	perl ./helpers/syscall.pl docs/syscall_64.tbl syscall.cc syscall.h
+
+syscall.cc: helpers/syscall.pl docs/syscall_64.tbl
+	perl ./helpers/syscall.pl docs/syscall_64.tbl syscall.cc syscall.h
 
 capio.1: capio.pod
 	pod2man -center "General Commands Manual" -section 1 capio.pod >capio.1
