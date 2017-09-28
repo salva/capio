@@ -30,6 +30,8 @@ using namespace std;
 #include "regs.h"
 #include "dumper.h"
 #include "memory.h"
+#include "group.h"
+#include "handler.h"
 
 static int debug_level = 0;
 static unordered_map<int, bool> dumping_fds;
@@ -688,9 +690,15 @@ main(int argc, char *argv[], char *env[]) {
                                                  splice_flags2string(ARG3).c_str());
                                 break;
                             default:
+                                debug(1, "syscall %d!", OP);
+                                if ((OP < 0) && (OP > SYSCALL_LAST)) {
+                                    handle_syscall_unexpected(capio, p, regs);
+                                }
+                                else {
+                                    syscalls[OP].handler(capio, p, regs);
+                                }
                                 //if (!capio.quiet && p.dumping && p.dumping_fd(ARG0)) 
                                 //    out << "#" << pid << " __ unsupported system call__(" << OP << ") = " << RC << endl << flush;
-                                debug(1, "syscall %d!", OP);
                                 break;
                             }
                         }

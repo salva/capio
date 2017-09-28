@@ -4,12 +4,12 @@ use strict;
 use warnings;
 use YAML ();
 
-my $make_dumper = 0;
+my $make_handler = 0;
 
 my $tbl = shift // 'docs/syscall_64.tbl';
 
 my $out_cc = shift // 'syscall.cc';
-my $out_dumper_cc = shift // 'dumper.cc';
+my $out_handler_cc = shift // 'handler.cc';
 
 my $out_h  = shift // 'group.h';
 my $out_yaml = shift // 'syscall.yaml';
@@ -116,7 +116,7 @@ while (my ($k, $v) = each %group) {
 }
 
 my %syscall;
-my %dumper = (dump_syscall_unexpected => 1);
+my %handler = (handle_syscall_unexpected => 1);
 
 my $max_n = -1;
 while (<$fh>) {
@@ -135,13 +135,13 @@ while (<$fh>) {
     push @flags, 'read' if grep $_ eq 'read', @groups;
     push @flags, 'write' if grep $_ eq 'write', @groups;
 
-    my $dumper = "dump_syscall__$name";
-    $dumper{$dumper} = 1;
+    my $handler = "handle_syscall__$name";
+    $handler{$handler} = 1;
 
     $syscall{$n} = { n => $n,
                      name => $name,
                      entry => $entry,
-                     dumper => $dumper,
+                     handler => $handler,
                      flags => [sort @flags],
                      groups => [sort @{$grinv{$name} // []}] };
 }
@@ -172,9 +172,9 @@ print $fh_cc <<EOH;
 
 EOH
 
-for my $dumper (sort keys %dumper) {
+for my $handler (sort keys %handler) {
     print $fh_cc <<EOH;
-void $dumper(Capio &c, Process &p, struct user_regs_struct &regs);
+void $handler(Capio &c, Process &p, struct user_regs_struct &regs);
 EOH
 }
 
@@ -190,12 +190,12 @@ for my $n (0..$max_n) {
         my @g =  @{$sc->{groups}};
         my $groups = (@g ? join '|', map "GROUP_".uc($_), @g : '0');
         print $fh_cc <<EOH;
-    { /* $n */ "$sc->{name}", $flags, $groups, $sc->{dumper} },
+    { /* $n */ "$sc->{name}", $flags, $groups, $sc->{handler} },
 EOH
     }
     else {
         print $fh_cc <<EOH;
-    { /* $n */ "unexpected_$n", SYSCALL_UNEXPECTED, GROUP_UNEXPECTED, &dump_syscall_unexpected, },
+    { /* $n */ "unexpected_$n", SYSCALL_UNEXPECTED, GROUP_UNEXPECTED, &handle_syscall_unexpected, },
 EOH
     }
 }
@@ -206,20 +206,20 @@ print $fh_cc <<EOH;
 EOH
 
 
-if ($make_dumper) {
+if ($make_handler) {
 
-    open my $fh_dumper_cc, '>', "$out_dumper_cc.tmpl" or die "$out_dumper_cc.tmpl: $!";
+    open my $fh_handler_cc, '>', "$out_handler_cc.tmpl" or die "$out_handler_cc.tmpl: $!";
 
-    print $fh_dumper_cc <<EOCC;
+    print $fh_handler_cc <<EOCC;
 #include "syscall.h"
 #include "regs.h"
 
 EOCC
 
-    for my $dumper (sort keys %dumper) {
-        print $fh_dumper_cc <<EOCC;
+    for my $handler (sort keys %handler) {
+        print $fh_handler_cc <<EOCC;
 void
-$dumper(Capio &c, Process &p, struct user_regs_struct &regs) {
+$handler(Capio &c, Process &p, struct user_regs_struct &regs) {
 
 }
 

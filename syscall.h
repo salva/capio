@@ -5,7 +5,7 @@ struct Capio;
 struct Process;
 struct user_regs_struct;
 
-typedef void (*syscall_dumper)(Capio &c, Process &p, struct user_regs_struct &regs);
+typedef void (*syscall_handler)(Capio &c, Process &p, struct user_regs_struct &regs);
 
 #define SYSCALL_UNEXPECTED 1
 #define SYSCALL_READ 2
@@ -18,7 +18,7 @@ struct syscall {
     const char *name;
     int flags;
     long long groups;
-    syscall_dumper dumper;
+    syscall_handler handler;
 
     bool writes() {
         return ((flags & SYSCALL_WRITE) == SYSCALL_WRITE);
