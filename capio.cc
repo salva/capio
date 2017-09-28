@@ -14,7 +14,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <linux/limits.h>
-#include <ext/stdio_filebuf.h>
 #include <bits/stdc++.h>
 
 #include <linux/netlink.h>
@@ -24,9 +23,11 @@
 using namespace std;
 
 #include "capio.h"
+#include "syscall.h"
 #include "flags.h"
 #include "sockaddr.h"
 #include "util.h"
+#include "regs.h"
 
 static int debug_level = 0;
 static unordered_map<int, bool> dumping_fds;
@@ -230,38 +231,6 @@ dump_raw(ostream &out, const unsigned char *data, size_t len) {
     out << flush;
 }
 
-static void*
-get_buffer(size_t len) {
-    static void *buffer = NULL;
-    static size_t buffer_size = 0;
-
-    if (len > buffer_size) {
-        buffer = realloc(buffer, len);
-        if (!buffer) fatal(NULL);
-    }
-    return buffer;
-}
-
-const unsigned char *
-read_proc_mem(pid_t pid, long long mem, size_t len) {
-    if (len > 0) {
-        size_t i, offset, len_long;
-        unsigned char *buffer;
-
-        offset = mem & (sizeof(long) - 1);
-        mem &= ~(sizeof(long) - 1);
-        len += offset;
-        len_long = (len + sizeof(long) - 1) / sizeof(long);
-        buffer = (unsigned char *)get_buffer(len_long * sizeof(long));
-
-        for (i = 0; i < len_long; i++)
-            ((long*)buffer)[i] = ptrace(PTRACE_PEEKTEXT, pid, mem + i * sizeof(long), NULL);
-
-        return buffer + offset;
-    }
-    return (const unsigned char*)"";
-}
-
 static void
 dump_mem(ostream &out, int format, bool writting, pid_t pid, long long mem, size_t len) {
     const unsigned char *data = read_proc_mem(pid, mem, len);
@@ -283,176 +252,6 @@ dump_mem(ostream &out, int format, bool writting, pid_t pid, long long mem, size
     default:
         debug(1, "Format %c not implemented yet", format);
         break;
-    }
-}
-
-static string
-read_proc_string_quoted(pid_t pid, long long mem, size_t len) {
-    stringstream ss;
-    if (mem) {
-        const unsigned char *data = read_proc_mem(pid, mem, len);
-        put_quoted(ss, data, len);
-        return ss.str();
-    }
-    return "NULL";
-}
-
-static void*
-read_proc_ptr(pid_t pid, long long mem) {
-    const unsigned char *data = read_proc_mem(pid, mem, sizeof(void*));
-    return ((void**)data)[0];
-}
-
-static string
-read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen = 16384) {
-    if (mem) {
-        stringstream ss;
-        ss << "\"";
-        while (maxlen) {
-            size_t chunk = 256 - (mem & 255);
-            if (chunk > maxlen) chunk = maxlen;
-            const unsigned char *data = read_proc_mem(pid, mem, chunk);
-            int len = strnlen((const char*)data, chunk);
-            put_quoted(ss, data, len, false, "", "");
-            if (len < chunk)
-                break;
-            mem += chunk;
-            maxlen -= chunk;
-        }
-        ss << "\"";
-        return ss.str();
-
-    }
-    return "NULL";
-}
-
-size_t round_up_len(size_t len) {
-    return ((len + sizeof(long) - 1) & ~(sizeof(long) - 1));
-}
-
-static string
-read_proc_sockaddr(pid_t pid, long long mem, size_t len) {
-    if (mem) {
-        auto data = (struct sockaddr *)read_proc_mem(pid, mem, len);
-        return sockaddr2string(data, len);
-    }
-    else {
-        return "NULL";
-    }
-}
-
-static string
-read_proc_off_t(pid_t pid, long long mem) {
-    if (mem) {
-        auto data = (const off_t *)read_proc_mem(pid, mem, sizeof(off_t));
-        return to_string(*data);
-    }
-    return "NULL";
-}
-
-static string
-read_proc_array_c_string_quoted(pid_t pid, long long mem) {
-    if (mem) {
-        stringstream ss;
-        ss << "[";
-        char **argv = (char **)mem;
-        for (int i = 0;; i++) {
-            void *arg = read_proc_ptr(pid, (long long)(argv + i));
-            if (!arg) break;
-            if (i > 0) ss << ", ";
-            ss << read_proc_c_string_quoted(pid, (long long)arg);
-        }
-        ss << "]";
-        return ss.str();
-    }
-    return "NULL";
-}
-
-static void
-read_proc_struct(pid_t pid, long long mem, size_t len, void *to) {
-    const unsigned char *data = read_proc_mem(pid, mem, len);
-    memcpy(to, data, len);
-}
-
-static long long
-syscall_op(struct user_regs_struct &regs) { return regs.orig_rax; }
-static long long
-syscall_rc(struct user_regs_struct &regs) { return regs.rax; }
-static long long
-syscall_arg0(struct user_regs_struct &regs) { return regs.rdi; }
-static long long
-syscall_arg1(struct user_regs_struct &regs) { return regs.rsi; }
-static long long
-syscall_arg2(struct user_regs_struct &regs) { return regs.rdx; }
-static long long
-syscall_arg3(struct user_regs_struct &regs) { return regs.r10; }
-static long long
-syscall_arg4(struct user_regs_struct &regs) { return regs.r8; }
-static long long
-syscall_arg5(struct user_regs_struct &regs) { return regs.r9; }
-
-#define OP (syscall_op(regs))
-#define RC (syscall_rc(regs))
-#define ARG0 (syscall_arg0(regs))
-#define ARG1 (syscall_arg1(regs))
-#define ARG2 (syscall_arg2(regs))
-#define ARG3 (syscall_arg3(regs))
-#define ARG4 (syscall_arg4(regs))
-#define ARG5 (syscall_arg5(regs))
-
-static void
-dump_syscall_start(ostream &out, pid_t pid, const char *name) {
-    out << "# ";
-    if (dump_children)
-        out << pid << " ";
-    out << name;
-}
-
-static void
-dump_syscall_argsv(ostream &out, const char *fmt, va_list args) {
-    size_t available = 4096;
-    while (1) {
-        va_list args_cp;
-        va_copy(args_cp, args);
-        char *buff = (char *)get_buffer(available);
-        size_t required = vsnprintf(buff, available, fmt, args_cp);
-        va_end(args_cp);
-        if (required < available) {
-            out << "(" << buff << ")";
-            break;
-        }
-        available = required + 10;
-    }
-}
-
-static void
-dump_syscall_end(ostream &out, long long rc) {
-    if (rc < 0)
-        out << " = -1, errno:" << e_flags2string(-rc);
-    else
-        out << " = " << rc;
-}
-
-static void
-dump_syscall_wo_endl(ostream &out, pid_t pid, const char *name, long long rc, const char *fmt ...) {
-    dump_syscall_start(out, pid, name);
-    va_list args;
-    va_start(args, fmt);
-    dump_syscall_argsv(out, fmt, args);
-    va_end(args);
-    dump_syscall_end(out, rc);
-}
-
-static void
-dump_syscall(ostream &out, pid_t pid, const char *name, long long rc, const char *fmt ...) {
-    if (!quiet) {
-        dump_syscall_start(out, pid, name);
-        va_list args;
-        va_start(args, fmt);
-        dump_syscall_argsv(out, fmt, args);
-        va_end(args);
-        dump_syscall_end(out, rc);
-        out << endl;
     }
 }
 

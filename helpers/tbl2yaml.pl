@@ -4,15 +4,97 @@ use strict;
 use warnings;
 use YAML ();
 
+my $make_dumper = 0;
+
 my $tbl = shift // 'docs/syscall_64.tbl';
-my $out = shift // 'syscalls.yaml';
+
+my $out_cc = shift // 'syscall.cc';
+my $out_dumper_cc = shift // 'dumper.cc';
+
+my $out_h  = shift // $out_cc =~ s/(?:\.cc)?$/.h/r;
+my $out_yaml = shift // $out_cc =~ s/(?:\.cc)?$/.yaml/r;
 
 open my $fh, '<', $tbl or die "$tbl: $!\n";
 
-my %group = ( read  => [qw(read pread64 readv preadv preadv2 recvfrom recvmsg recvmmsg)],
-              write => [qw(write pwrite64 writev pwritev pwritev2 sendto sendmsg sendmmsg vmsplice)],
-              io    => [qw(%read %write sendfile splice tee)],
-              desc  => [qw(%io)] );
+my %group = ( read  =>
+              [qw(read pread64 readv preadv preadv2 recvfrom recvmsg recvmmsg)],
+
+              write =>
+              [qw(write pwrite64 writev pwritev pwritev2 sendto sendmsg sendmmsg vmsplice)],
+
+              io =>
+              [qw(%read %write sendfile splice tee)],
+
+              desc =>
+              [qw(%strace_desc)],
+
+
+              unexpected => [], # this is filled automatically bellow
+
+              strace_capture_on_enter =>
+              [qw(execve exit exit_group execveat)],
+
+              strace_desc =>
+              [qw(read write open close fstat poll lseek mmap ioctl pread64 pwrite64 readv writev pipe select dup dup2 sendfile fcntl flock
+                  fsync fdatasync ftruncate getdents fchdir creat fchmod fchown fstatfs readahead fsetxattr fgetxattr flistxattr
+                  fremovexattr epoll_create getdents64 fadvise64 epoll_wait epoll_ctl inotify_init inotify_add_watch inotify_rm_watch openat
+                  mkdirat mknodat fchownat futimesat newfstatat unlinkat renameat linkat symlinkat readlinkat fchmodat faccessat pselect6
+                  ppoll splice tee sync_file_range vmsplice utimensat epoll_pwait signalfd timerfd_create eventfd fallocate timerfd_settime
+                  timerfd_gettime signalfd4 eventfd2 epoll_create1 dup3 pipe2 inotify_init1 preadv pwritev perf_event_open fanotify_init
+                  fanotify_mark name_to_handle_at open_by_handle_at syncfs setns finit_module renameat2 memfd_create kexec_file_load bpf
+                  execveat userfaultfd copy_file_range preadv2 pwritev2 statx)],
+
+              strace_file =>
+              [qw(open stat lstat access execve truncate getcwd chdir rename mkdir rmdir creat link unlink symlink readlink chmod chown
+                  lchown utime mknod uselib statfs pivot_root chroot acct mount umount2 swapon swapoff quotactl setxattr lsetxattr getxattr
+                  lgetxattr listxattr llistxattr removexattr lremovexattr utimes inotify_add_watch openat mkdirat mknodat fchownat futimesat
+                  newfstatat unlinkat renameat linkat symlinkat readlinkat fchmodat faccessat utimensat fanotify_mark name_to_handle_at
+                  renameat2 execveat statx)],
+
+              strace_fstat =>
+              [qw(fstat newfstatat)],
+
+              strace_fstatfs =>
+              [qw(fstatfs)],
+
+              strace_invalidate_cache =>
+              [qw(mmap mprotect munmap brk mremap shmat execve shmdt remap_file_pages execveat pkey_mprotect)],
+
+              strace_ipc =>
+              [qw(shmget shmat shmctl semget semop semctl shmdt msgget msgsnd msgrcv msgctl semtimedop)],
+
+              strace_lstat =>
+              [qw(lstat)],
+
+              strace_memory =>
+              [qw(mmap mprotect munmap brk mremap msync mincore madvise shmat shmdt mlock munlock mlockall munlockall io_setup io_destroy
+                  remap_file_pages mbind set_mempolicy get_mempolicy migrate_pages move_pages mlock2 pkey_mprotect)],
+
+              strace_network =>
+              [qw(sendfile socket connect accept sendto recvfrom sendmsg recvmsg shutdown bind listen getsockname getpeername socketpair
+                  setsockopt getsockopt getpmsg putpmsg accept4 recvmmsg sendmmsg)],
+
+              strace_process =>
+              [qw(clone fork vfork execve exit wait4 arch_prctl exit_group waitid unshare rt_tgsigqueueinfo execveat)],
+
+              strace_signal =>
+              [qw(rt_sigaction rt_sigprocmask rt_sigreturn pause kill rt_sigpending rt_sigtimedwait rt_sigqueueinfo rt_sigsuspend
+                  sigaltstack tkill tgkill signalfd signalfd4 rt_tgsigqueueinfo)],
+
+              strace_stat =>
+              [qw(stat)],
+
+              strace_stat_like =>
+              [qw(stat fstat lstat newfstatat statx)],
+
+              strace_statfs =>
+              [qw(statfs)],
+
+              strace_statfs_like =>
+              [qw(ustat statfs fstatfs)],
+
+
+            );
 
 sub _expand_group {
     my $k = shift;
@@ -33,29 +115,128 @@ while (my ($k, $v) = each %group) {
     push @{$grinv{$_} //= []}, $k for @$v;
 }
 
-use Data::Dumper;
-warn Dumper \%grinv;
+my %syscall;
+my %dumper = (dump_syscall_unexpected => 1);
 
-my %out;
-
+my $max_n = -1;
 while (<$fh>) {
     next if /^\s*(?:#.*)?$/;
     my ($n, $abi, $name, $entry) = split /\s+/, $_;
+
+    $max_n = $n if $n > $max_n;
 
     my @flags = ($abi eq 'common' ? ('abi-64', 'abi-x32') : "abi-$abi");
     while ($entry =~ s|/([^/]+)||) {
         push @flags, $1;
     }
 
-    $out{sprintf "0x%04x", $n} = { name => $name,
-                                   entry => $entry,
-                                   flags => [sort @flags],
-                                   groups => [sort @{$grinv{$name} // []}] };
+    my $dumper = "dump_syscall__$name";
+    $dumper{$dumper} = 1;
+
+    $syscall{$n} = { n => $n,
+                     name => $name,
+                     entry => $entry,
+                     dumper => $dumper,
+                     flags => [sort @flags],
+                     groups => [sort @{$grinv{$name} // []}] };
 }
 
+YAML::DumpFile($out_yaml, \%syscall);
+
+open my $fh_cc, '>', $out_cc or die "$out_cc: $!";
+open my $fh_h,  '>', $out_h  or die "$out_h: $!";
+
+print $fh_h <<EOH;
+
+//#include "capio.h";
+
+struct Capio;
+struct Process;
+struct user_regs_struct;
+
+typedef void (*syscall_dumper)(Capio &c, Process &p, struct user_regs_struct &regs);
+
+struct syscall {
+    const char *name;
+    int flags;
+    long long groups;
+    syscall_dumper dumper;
+};
+
+extern struct syscall syscalls[];
+EOH
+
+print $fh_h <<EOH;
+
+#define SYSCALL_UNEXPECTED 1
+#define SYSCALL_LAST $max_n
+
+EOH
+
+my $group_bit = 0;
+for my $group (sort keys %group) {
+    my $tag = "GROUP_" . uc $group;
+    my $val = 1 << $group_bit++;
+    print $fh_h <<EOH;
+#define $tag $val
+EOH
+}
+
+print $fh_cc <<EOH;
+#include "syscall.h"
+
+EOH
+
+for my $dumper (sort keys %dumper) {
+    print $fh_cc <<EOH;
+void $dumper(Capio &c, Process &p, struct user_regs_struct &regs);
+EOH
+}
+
+print $fh_cc <<EOH;
+
+struct syscall syscalls[] = {
+EOH
+
+for my $n (0..$max_n) {
+    if (my $sc = $syscall{$n}) {
+        my $flags = 0;
+        my @g =  @{$sc->{groups}};
+        my $groups = (@g ? join '|', map "GROUP_".uc($_), @g : '0');
+        print $fh_cc <<EOH;
+    { /* $n */ "$sc->{name}", $flags, $groups, $sc->{dumper} },
+EOH
+    }
+    else {
+        print $fh_cc <<EOH;
+    { /* $n */ "unexpected_$n", SYSCALL_UNEXPECTED, GROUP_UNEXPECTED, &dump_syscall_unexpected, },
+EOH
+    }
+}
+
+print $fh_cc <<EOH;
+};
+
+EOH
 
 
-#use Data::Dumper;
-#warn Dumper(\@out);
+if ($make_dumper) {
 
-YAML::DumpFile($out, \%out);
+    open my $fh_dumper_cc, '>', "$out_dumper_cc.tmpl" or die "$out_dumper_cc.tmpl: $!";
+
+    print $fh_dumper_cc <<EOCC;
+#include "syscall.h"
+#include "regs.h"
+
+EOCC
+
+    for my $dumper (sort keys %dumper) {
+        print $fh_dumper_cc <<EOCC;
+void
+$dumper(Capio &c, Process &p, struct user_regs_struct &regs) {
+
+}
+
+EOCC
+    }
+}

@@ -1,5 +1,5 @@
 
-H_FILES := capio.h flags.h sockaddr.h
+H_FILES := capio.h flags.h sockaddr.h syscall.h regs.h dual_ostream.h memory.h
 
 ifneq ($(WITH_PERL),)
 	PERL_ARCHLIB := $(shell perl -MConfig -E 'say $$Config{archlib}')
@@ -16,7 +16,7 @@ all: capio capio.1
 #capio: capio.cpp $(H_FILES)
 #	g++ -std=gnu++11 $(CPPFLAGS) -O0 -g capio.cpp $(LDFLAGS) -o capio
 
-capio: capio.o flags.o sockaddr.o util.o
+capio: capio.o flags.o sockaddr.o util.o syscall.o dumper.o dual_ostream.o memory.o
 
 flags.h: flags.pl flags.yaml
 	perl ./flags.pl flags.yaml flags.cc flags.h

@@ -42,6 +42,4 @@ while (<>) {
     }
 }
 
-use Data::Dumper;
-warn Dumper(\%group)."\n"
-
+print "    $_ =>\n\n    [qw(", join(' ', @{$group{$_}}), ")],\n\n" for sort keys %group;
