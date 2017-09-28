@@ -11,7 +11,7 @@ my $tbl = shift // 'docs/syscall_64.tbl';
 my $out_cc = shift // 'syscall.cc';
 my $out_handler_cc = shift // 'handler.cc';
 
-my $out_h  = shift // 'group.h';
+my $out_h  = shift // 'syscall_defs.h';
 my $out_yaml = shift // 'syscall.yaml';
 
 open my $fh, '<', $tbl or die "$tbl: $!\n";
@@ -168,7 +168,7 @@ EOH
 
 print $fh_cc <<EOH;
 #include "syscall.h"
-#include "group.h"
+#include "$out_h"
 
 EOH
 

@@ -24,13 +24,14 @@ using namespace std;
 
 #include "capio.h"
 #include "syscall.h"
+#include "syscall_defs.h"
 #include "flags.h"
 #include "sockaddr.h"
 #include "util.h"
 #include "regs.h"
 #include "dumper.h"
 #include "memory.h"
-#include "group.h"
+
 #include "handler.h"
 
 static int debug_level = 0;
