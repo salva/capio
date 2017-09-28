@@ -11,8 +11,8 @@ my $tbl = shift // 'docs/syscall_64.tbl';
 my $out_cc = shift // 'syscall.cc';
 my $out_dumper_cc = shift // 'dumper.cc';
 
-my $out_h  = shift // $out_cc =~ s/(?:\.cc)?$/.h/r;
-my $out_yaml = shift // $out_cc =~ s/(?:\.cc)?$/.yaml/r;
+my $out_h  = shift // 'group.h';
+my $out_yaml = shift // 'syscall.yaml';
 
 open my $fh, '<', $tbl or die "$tbl: $!\n";
 
@@ -125,10 +125,15 @@ while (<$fh>) {
 
     $max_n = $n if $n > $max_n;
 
-    my @flags = ($abi eq 'common' ? ('abi-64', 'abi-x32') : "abi-$abi");
+    my @groups = sort @{$grinv{$name} // []};
+
+    my @flags = ($abi eq 'common' ? ('abi_64', 'abi_x32') : "abi_$abi");
     while ($entry =~ s|/([^/]+)||) {
         push @flags, $1;
     }
+
+    push @flags, 'read' if grep $_ eq 'read', @groups;
+    push @flags, 'write' if grep $_ eq 'write', @groups;
 
     my $dumper = "dump_syscall__$name";
     $dumper{$dumper} = 1;
@@ -148,27 +153,6 @@ open my $fh_h,  '>', $out_h  or die "$out_h: $!";
 
 print $fh_h <<EOH;
 
-//#include "capio.h";
-
-struct Capio;
-struct Process;
-struct user_regs_struct;
-
-typedef void (*syscall_dumper)(Capio &c, Process &p, struct user_regs_struct &regs);
-
-struct syscall {
-    const char *name;
-    int flags;
-    long long groups;
-    syscall_dumper dumper;
-};
-
-extern struct syscall syscalls[];
-EOH
-
-print $fh_h <<EOH;
-
-#define SYSCALL_UNEXPECTED 1
 #define SYSCALL_LAST $max_n
 
 EOH
@@ -184,6 +168,7 @@ EOH
 
 print $fh_cc <<EOH;
 #include "syscall.h"
+#include "group.h"
 
 EOH
 
@@ -200,7 +185,8 @@ EOH
 
 for my $n (0..$max_n) {
     if (my $sc = $syscall{$n}) {
-        my $flags = 0;
+        my @f = @{$sc->{flags}};
+        my $flags = (@f ? join '|', map "SYSCALL_".uc($_), @f : '0');
         my @g =  @{$sc->{groups}};
         my $groups = (@g ? join '|', map "GROUP_".uc($_), @g : '0');
         print $fh_cc <<EOH;

@@ -3,10 +3,11 @@
 #include "regs.h"
 #include "memory.h"
 #include "flags.h"
+#include "util.h"
 
 using namespace std;
 
-static void
+void
 dump_syscall_start(Capio &c, Process &p, struct user_regs_struct &regs) {
     dual_ostream &out = c.out(p);
     out << "# ";
@@ -15,7 +16,7 @@ dump_syscall_start(Capio &c, Process &p, struct user_regs_struct &regs) {
     out << syscalls[OP].name;
 }
 
-static void
+void
 dump_syscall_argsv(Capio &c, Process &p, const char *fmt, va_list args) {
     dual_ostream &out = c.out(p);
     size_t available = 4096;
@@ -33,7 +34,7 @@ dump_syscall_argsv(Capio &c, Process &p, const char *fmt, va_list args) {
     }
 }
 
-static void
+void
 dump_syscall_end(Capio &c, Process &p, struct user_regs_struct &regs) {
     dual_ostream &out = c.out(p);
     if (RC < 0)
@@ -42,7 +43,7 @@ dump_syscall_end(Capio &c, Process &p, struct user_regs_struct &regs) {
         out << " = " << RC;
 }
 
-static void
+void
 dump_syscall_wo_endl(Capio &c, Process &p, struct user_regs_struct &regs, const char *fmt ...) {
     dump_syscall_start(c, p, regs);
     va_list args;
@@ -52,7 +53,7 @@ dump_syscall_wo_endl(Capio &c, Process &p, struct user_regs_struct &regs, const 
     dump_syscall_end(c, p, regs);
 }
 
-static void
+void
 dump_syscall(Capio &c, Process &p, struct user_regs_struct &regs, const char *fmt ...) {
     if (!c.quiet) {
         dump_syscall_start(c, p, regs);
@@ -62,6 +63,89 @@ dump_syscall(Capio &c, Process &p, struct user_regs_struct &regs, const char *fm
         va_end(args);
         dump_syscall_end(c, p, regs);
         c.out(p) << endl;
+    }
+}
+
+#define LINELEN 32
+static void dump_hex(ostream &out, bool writting, const unsigned char *data, size_t len) {
+    int dir = (writting ? '>' : '<');
+    int lines = (len + LINELEN - 1) / LINELEN;
+    for (int i = 0; i < lines; i++) {
+        out.put(dir);
+        for (int j = 0; j < LINELEN; j++) {
+            int off = i * LINELEN + j;
+            if (off < len) {
+                char hex[10];
+                sprintf(hex, " %02x", data[off]);
+                out << hex;
+            }
+            else
+                out << " __";
+        }
+        out << " "; out.put(dir); out << " ";
+        for (int j = 0; j < LINELEN; j++) {
+            int off = i * LINELEN + j;
+            if (off >= len) break;
+            out.put(isprint(data[off]) ? data[off] : '.');
+        }
+        out << endl << flush;
+    }
+}
+
+static void
+dump_quoted(ostream &out, bool writting, const unsigned char *data, size_t len, bool breaks) {
+    if (len) {
+        put_quoted(out, data, len, breaks, (writting ? "> " : "< "));
+        out << endl << flush;
+    }
+}
+
+static void
+dump_raw(ostream &out, const unsigned char *data, size_t len) {
+    out.write(reinterpret_cast<const char *>(data), len);
+    out << flush;
+}
+
+void
+dump_mem(Capio &c, Process &p, struct user_regs_struct &regs, long long mem, size_t len) {
+    dual_ostream &out = c.out(p);
+    bool writting = syscalls[OP].writes();
+    const unsigned char *data = read_proc_mem(p.pid, mem, len);
+    switch (c.format) {
+    case 'x':
+        dump_hex(out, writting, data, len);
+        break;
+    case 'q':
+        dump_quoted(out, writting, data, len, false);
+        break;
+    case 'n':
+        dump_quoted(out, writting, data, len, true);
+        break;
+    case 'r':
+        dump_raw(out, data, len);
+        break;
+    case '0':
+        break;
+    default:
+        debug(1, "Format %c not implemented yet", c.format);
+        break;
+    }
+}
+
+void
+dump_iov(Capio &c, Process &p, struct user_regs_struct &regs, long long mem, long long len) {
+    size_t remaining = RC;
+    auto vec = (struct iovec *)mem;
+    for (size_t i = 0; remaining && i < len; i++) {
+        struct iovec iov;
+        read_proc_struct(p.pid, (long long)(vec + i), sizeof(iov), &iov);
+        size_t chunk = ((remaining > iov.iov_len) ? iov.iov_len : remaining);
+        dump_mem(c, p, regs, (long long)iov.iov_base, chunk);
+#ifdef WITH_PERL
+        if (perl_flag)
+            dump_perl(out, p, fd, syscall_name, rc, writting, (long long)iov.iov_base, chunk);
+#endif
+        remaining -= chunk;
     }
 }
 

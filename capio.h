@@ -5,7 +5,7 @@
 
 #include "dual_ostream.h"
 
-static void debug(int level, const char *fmt...);
+void debug(int level, const char *fmt...);
 const unsigned char* read_proc_mem(pid_t pid, long long mem, size_t len);
 void fatal(const char *msg);
 
@@ -45,9 +45,25 @@ private:
 struct Capio {
     bool dump_children;
     bool quiet;
+    bool multifile;
+    bool dont_follow;
+    char format;
+    std::string *out_fn;
+    dual_ostream *default_out;
+
+    Capio() :
+        format('\0'), dump_children(false), quiet(false),
+        dont_follow(false), multifile(false),
+        out_fn(NULL), default_out(NULL)
+        {}
 
     dual_ostream &out(Process &p);
     dual_ostream &out();
 
+    void
+    dup_fd(Process &p, int old_fd, int new_fd) {
+        if (!dont_follow)
+            p.dup_fd(old_fd, new_fd);
+    }
 
 };

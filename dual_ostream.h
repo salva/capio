@@ -9,7 +9,7 @@ public:
         fd(fd_) {
         rdbuf(new  __gnu_cxx::stdio_filebuf<char>(fd, std::ios::out));
     }
-    dual_ostream(std::string &fn);
+    dual_ostream(const std::string &fn);
     ~dual_ostream() {
         flush();
         delete rdbuf();

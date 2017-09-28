@@ -1,5 +1,5 @@
 
-H_FILES := capio.h flags.h sockaddr.h syscall.h regs.h dual_ostream.h memory.h
+H_FILES := capio.h flags.h sockaddr.h syscall.h regs.h dual_ostream.h memory.h group.h
 
 ifneq ($(WITH_PERL),)
 	PERL_ARCHLIB := $(shell perl -MConfig -E 'say $$Config{archlib}')
@@ -24,11 +24,11 @@ flags.h: helpers/flags.pl flags.yaml
 flags.cc: helpers/flags.pl flags.yaml
 	perl ./helpers/flags.pl flags.yaml flags.cc flags.h
 
-syscall.h: helpers/syscall.pl docs/syscall_64.tbl
-	perl ./helpers/syscall.pl docs/syscall_64.tbl syscall.cc syscall.h
+group.h: helpers/syscall.pl docs/syscall_64.tbl
+	perl ./helpers/syscall.pl docs/syscall_64.tbl syscall.cc group.h
 
 syscall.cc: helpers/syscall.pl docs/syscall_64.tbl
-	perl ./helpers/syscall.pl docs/syscall_64.tbl syscall.cc syscall.h
+	perl ./helpers/syscall.pl docs/syscall_64.tbl syscall.cc group.h
 
 capio.1: capio.pod
 	pod2man -center "General Commands Manual" -section 1 capio.pod >capio.1
