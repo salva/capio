@@ -38,6 +38,7 @@ struct Process {
     bool dumping_fd(int fd);
     void reset_process_name();
     const std::string &fd_path(int fd);
+
 private:
     std::unordered_map<int,FDGroup*> fdgroups;
 };

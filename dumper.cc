@@ -107,11 +107,8 @@ dump_raw(ostream &out, const unsigned char *data, size_t len) {
 }
 
 void
-dump_mem(Capio &c, Process &p, struct user_regs_struct &regs, long long mem, size_t len) {
-    dual_ostream &out = c.out(p);
-    bool writting = syscalls[OP].writes();
-    const unsigned char *data = read_proc_mem(p.pid, mem, len);
-    switch (c.format) {
+dump_mem(dual_ostream &out, char format, bool writting, const unsigned char *data, size_t len) {
+    switch (format) {
     case 'x':
         dump_hex(out, writting, data, len);
         break;
@@ -127,9 +124,21 @@ dump_mem(Capio &c, Process &p, struct user_regs_struct &regs, long long mem, siz
     case '0':
         break;
     default:
-        debug(1, "Format %c not implemented yet", c.format);
+        debug(1, "Format %c not implemented yet", format);
         break;
     }
+}
+
+void
+dump_io(Capio &c, Process &p, struct user_regs_struct &regs, long long mem, size_t len) {
+    dual_ostream &out = c.out(p);
+    bool writting = syscalls[OP].writes();
+    const unsigned char *data = read_proc_mem(p.pid, mem, len);
+    dump_mem(out, c.format, writting, data, len);
+#ifdef WITH_PERL
+    if (perl_flag)
+        dump_perl(out, p, ARG0, syscalls[OP].name, RC, writting, data, len);
+#endif
 }
 
 void
@@ -140,11 +149,7 @@ dump_iov(Capio &c, Process &p, struct user_regs_struct &regs, long long mem, lon
         struct iovec iov;
         read_proc_struct(p.pid, (long long)(vec + i), sizeof(iov), &iov);
         size_t chunk = ((remaining > iov.iov_len) ? iov.iov_len : remaining);
-        dump_mem(c, p, regs, (long long)iov.iov_base, chunk);
-#ifdef WITH_PERL
-        if (perl_flag)
-            dump_perl(out, p, fd, syscall_name, rc, writting, (long long)iov.iov_base, chunk);
-#endif
+        dump_io(c, p, regs, mem, len);
         remaining -= chunk;
     }
 }
