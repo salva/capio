@@ -28,6 +28,11 @@ my %group = ( read  =>
               desc =>
               [qw(%strace_desc)],
 
+              process =>
+              [qw(%strace_process)],
+
+              default =>
+              [qw(%desc %process)],
 
               unexpected => [], # this is filled automatically bellow
 

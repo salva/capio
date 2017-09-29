@@ -57,6 +57,28 @@ read_proc_ptr(pid_t pid, long long mem) {
 }
 
 string
+read_proc_c_string(pid_t pid, long long mem, size_t maxlen) {
+    if (mem) {
+        stringstream ss;
+        int start = mem & (sizeof(long) - 1);
+        while (maxlen > 0) {
+            union {
+                unsigned char buffer[1];
+                long buffer_long;
+            };
+            buffer_long = ptrace(PTRACE_PEEKTEXT, pid, mem - start, NULL);
+            for (int i = start; maxlen-- && (i < sizeof(long)); i++) {
+                if (buffer[i] == 0) break;
+                ss.put(buffer[i]);
+            }
+            start = 0;
+        }
+        return ss.str();
+    }
+    return "";
+}
+
+string
 read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen) {
     if (mem) {
         stringstream ss;
@@ -78,6 +100,7 @@ read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen) {
     }
     return "NULL";
 }
+
 
 size_t round_up_len(size_t len) {
     return ((len + sizeof(long) - 1) & ~(sizeof(long) - 1));
@@ -104,6 +127,24 @@ read_proc_off_t(pid_t pid, long long mem) {
 }
 
 string
+read_proc_size_t(pid_t pid, long long mem) {
+    if (mem) {
+        auto data = (const size_t *)read_proc_mem(pid, mem, sizeof(size_t));
+        return to_string(*data);
+    }
+    return "NULL";
+}
+
+string
+read_proc_int(pid_t pid, long long mem) {
+    if (mem) {
+        auto data = (const int*)read_proc_mem(pid, mem, sizeof(int));
+        return to_string(*data);
+    }
+    return "NULL";
+}
+
+string
 read_proc_array_c_string_quoted(pid_t pid, long long mem) {
     if (mem) {
         stringstream ss;
@@ -112,7 +153,7 @@ read_proc_array_c_string_quoted(pid_t pid, long long mem) {
         for (int i = 0;; i++) {
             void *arg = read_proc_ptr(pid, (long long)(argv + i));
             if (!arg) break;
-            if (i > 0) ss << ", ";
+            if (i) ss << ", ";
             ss << read_proc_c_string_quoted(pid, (long long)arg);
         }
         ss << "]";
@@ -125,4 +166,41 @@ void
 read_proc_struct(pid_t pid, long long mem, size_t len, void *to) {
     const unsigned char *data = read_proc_mem(pid, mem, len);
     memcpy(to, data, len);
+}
+
+string
+read_proc_array_int(pid_t pid, long long mem, size_t items) {
+    if (mem) {
+        stringstream ss;
+        ss << "[";
+        int *ptr = (int *)mem;
+        for (int i = 0; i < items; i++) {
+            if (i) ss << ", ";
+            ss << read_proc_int(pid, (long long)(ptr + i));
+        }
+        ss << "]";
+        return ss.str();
+    }
+    return "NULL";
+}
+
+string
+read_proc_sysctl_args(pid_t pid, long long mem) {
+    if (mem) {
+        struct __sysctl_args args;
+        read_proc_struct(pid, mem, sizeof(args), &args);
+        size_t oldlen = 0;
+        if (args.oldlenp)
+            read_proc_struct(pid, mem, sizeof(oldlen), &oldlen);
+
+        stringstream ss;
+        ss << "{name:" << read_proc_array_int(pid, (long long)args.name, args.nlen)
+           << ", oldval:" << ((args.oldlenp && args.oldval)
+                              ? read_proc_string_quoted(pid, (long long)args.oldval, oldlen)
+                              : string("NULL"))
+           << ", newval:" << read_proc_string_quoted(pid, (long long)args.newval, args.newlen)
+           << "}";
+        return ss.str();
+    }
+    return "NULL";
 }

@@ -4,7 +4,8 @@
 
 long long
 syscall_lookup(const char *name) {
-    for (int i = 0; i++; i <= SYSCALL_LAST) {
+    debug(0, "syscall_lookup(%s)", name);
+    for (int i = 0; i <= SYSCALL_LAST; i++) {
         if (strcmp(name, syscalls[i].name) == 0)
             return i;
     }

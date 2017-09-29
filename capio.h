@@ -39,6 +39,7 @@ struct Process {
     bool dumping_fd(int fd);
     void reset_process_name();
     const std::string &fd_path(int fd);
+    std::string resolve_path(const std::string &path);
 
 private:
     std::unordered_map<int,FDGroup*> fdgroups;
@@ -77,4 +78,8 @@ struct Capio {
             p.dup_fd(old_fd, new_fd);
     }
 
+    bool dumping(Process &p, long long op);
+    bool dumping(Process &p, long long op, int fd1, int fd2 = -1);
+
+    bool dumping_path(const std::string &path);
 };

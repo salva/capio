@@ -155,7 +155,7 @@ Process::dup_fd(int oldfd, int newfd) {
 
 bool
 Process::dumping_fd(int fd) {
-    return (dumping && fdgroup(fd)->dumping);
+    return fdgroup(fd)->dumping;
 }
 
 bool
@@ -220,6 +220,33 @@ void
 Capio::disable_syscall(long long op) {
     if ((op >= 0) && (op <= SYSCALL_LAST))
         dumping_syscalls[op] = false;
+}
+
+bool
+Capio::dumping(Process &p, long long op) {
+    if ((op >= 0) && (op <= SYSCALL_LAST)) {
+        if (dumping_syscalls[op]) {
+            if (p.dumping)
+                return true;
+        }
+    }
+    return false;
+}
+
+bool
+Capio::dumping(Process &p, long long op, int fd1, int fd2) {
+    if (dumping(p, op)) {
+        if (p.dumping_fd(fd1)) {
+            if ((fd2 == -1) || p.dumping_fd(fd2))
+                return true;
+        }
+    }
+    return false;
+}
+
+bool
+Capio::dumping_path(const string &path) {
+    return (fn_patterns.empty() || match_fn_patterns(fn_patterns, path));
 }
 
 void
@@ -305,7 +332,7 @@ main(int argc, char *argv[], char *env[]) {
         }
     }
 
-    if (groups.empty() == 0)
+    if (groups.empty())
         groups.push_back("%default");
 
     for(auto const& group: groups) {
