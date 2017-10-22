@@ -66,6 +66,15 @@ dump_syscall(Capio &c, Process &p, struct user_regs_struct &regs, const char *fm
     }
 }
 
+void
+dump_syscall_unimplemented(Capio &c, Process &p, struct user_regs_struct &regs) {
+    if (!c.quiet) {
+        dump_syscall_start(c, p, regs);
+        dump_syscall_end(c, p, regs);
+        c.out(p) << "; unimplemented" << endl;
+    }
+}
+
 #define LINELEN 32
 static void dump_hex(ostream &out, bool writting, const unsigned char *data, size_t len) {
     int dir = (writting ? '>' : '<');

@@ -11,6 +11,7 @@ std::string read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen = 
 size_t round_up_len(size_t len);
 std::string read_proc_sockaddr(pid_t pid, long long mem, size_t len);
 std::string read_proc_int(pid_t pid, long long mem);
+std::string read_proc_ulong(pid_t pid, long long mem);
 std::string read_proc_off_t(pid_t pid, long long mem);
 std::string read_proc_array_c_string_quoted(pid_t pid, long long mem);
 void read_proc_struct(pid_t pid, long long mem, size_t len, void *to);

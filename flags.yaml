@@ -10,6 +10,8 @@ headers:
   - sys/xattr.h
   - sys/uio.h
   - linux/fs.h
+  - keyutils.h
+  - asm/prctl.h
 groups:
   msg:
     flags:
@@ -384,3 +386,20 @@ groups:
       - RWF_DSYNC
       - RWF_HIPRI
       - RWF_SYNC
+
+  key_spec:
+    exclusive:
+      - flags:
+          - KEY_SPEC_THREAD_KEYRING
+          - KEY_SPEC_PROCESS_KEYRING
+          - KEY_SPEC_SESSION_KEYRING
+          - KEY_SPEC_USER_KEYRING
+          - KEY_SPEC_USER_SESSION_KEYRING
+
+  arch:
+    exclusive:
+      - flags:
+          - ARCH_SET_FS
+          - ARCH_GET_FS
+          - ARCH_SET_GS
+          - ARCH_GET_GS

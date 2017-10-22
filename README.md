@@ -7,6 +7,14 @@ output can be a laborious and time consuming task.
 **capio** is very similar to **strace** but it focus on inspecting the
 I/O of the traced programs.
 
+### Dependencies
+
+`capio` requires the header files from `libkeyutils` (package
+`libkeyutils-dev` in Debian and derived distributions).
+
+In order to compile `capio` with Perl support, the perl development
+files are also required (package `libperl-dev` in Debian).
+
 ## Installation
 
 Currently, **capio** works only on Linux for x86_64.
@@ -15,8 +23,7 @@ Clone the GitHub repository at https://github.com/salva/capio.git and
 run `make`.
 
 If you want to compile capio with Perl support (highly recommended),
-you will need to install perl development files (package `libperl-dev`
-in Debian and derived distributions) and then run `make` as follows:
+run `make` as follows:
 
     make WITH_PERL=1
 

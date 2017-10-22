@@ -1,6 +1,8 @@
 #include <syscall.h>
 #include <bits/stdc++.h>
 
+#include <asm/prctl.h>
+
 #include "capio.h"
 #include "syscall.h"
 #include "regs.h"
@@ -164,34 +166,75 @@ handle_syscall__access(Capio &c, Process &p, struct user_regs_struct &regs) {
 void
 handle_syscall__acct(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP)) {
-        if (!ARG0 || c.dumping_path(read_proc_c_string(p.pid, ARG0))) {
+        if (ARG0) {
+            dump_syscall(c, p, regs, "path:NULL");
+        }
+        else if (!c.quiet) {
+            string abspath = p.resolve_path(read_proc_c_string(p.pid, ARG0));
+            if (!ARG0 || c.dumping_path(abspath)) {
+                dump_syscall_wo_endl(c, p, regs, "path:%s",
+                                     read_proc_c_string_quoted(p.pid, ARG0).c_str());
+                dual_ostream &out = c.out(p);
+                out << "; path:";
+                put_quoted(out, abspath);
+                out << endl;
+            }
         }
     }
 }
 
 void
 handle_syscall__add_key(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP)) {
+        dump_syscall(c, p, regs,
+                     "type:%s, description:%s, payload:%s, keyring:%s",
+                     read_proc_c_string_quoted(p.pid, ARG0).c_str(),
+                     read_proc_c_string_quoted(p.pid, ARG1).c_str(),
+                     read_proc_string_quoted(p.pid, ARG2, ARG3).c_str(),
+                     key_spec_flags2string(ARG4).c_str());
+    }
 }
 
 void
 handle_syscall__adjtimex(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP))
+        // FIXME: read and dump the timex structure both at syscall enter and exit
+        dump_syscall(c, p, regs, "tcx_p:0x%x", ARG0);
 }
 
 void
 handle_syscall__afs_syscall(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP))
+        dump_syscall_unimplemented(c, p, regs);
 }
 
 void
 handle_syscall__alarm(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP))
+        dump_syscall(c, p, regs, "seconds:%lld", ARG0);
 }
 
 void
 handle_syscall__arch_prctl(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP)) {
+        switch(ARG0) {
+        case ARCH_GET_FS:
+        case ARCH_GET_GS:
+            dump_syscall(c, p, regs,
+                         "code:%s, value:%s",
+                         arch_flags2string(ARG0).c_str(),
+                         read_proc_ulong(p.pid, ARG1).c_str());
+            break;
+        case ARCH_SET_FS:
+        case ARCH_SET_GS:
+        default:
+            dump_syscall(c, p, regs,
+                         "code:%s, value:%llu",
+                         arch_flags2string(ARG0).c_str(),
+                         ARG1);
+            break;
+        }
+    }
 }
 
 void

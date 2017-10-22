@@ -145,6 +145,15 @@ read_proc_int(pid_t pid, long long mem) {
 }
 
 string
+read_proc_ulong(pid_t pid, long long mem) {
+    if (mem) {
+        auto data = (const unsigned long*)read_proc_mem(pid, mem, sizeof(unsigned long));
+        return to_string(*data);
+    }
+    return "NULL";
+}
+
+string
 read_proc_array_c_string_quoted(pid_t pid, long long mem) {
     if (mem) {
         stringstream ss;
