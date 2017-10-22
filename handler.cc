@@ -247,17 +247,23 @@ handle_syscall__bind(Capio &c, Process &p, struct user_regs_struct &regs) {
 
 void
 handle_syscall__bpf(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP))
+        // FIXME: implement proper dumping of this syscall
+        dump_syscall(c, p, regs,
+                     "cmd:%s, attr:%s",
+                     bpf_cmd_flags2string(ARG0).c_str(),
+                     read_proc_string_quoted(p.pid, ARG1, ARG2).c_str());
 }
 
 void
 handle_syscall__brk(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP))
+        dump_syscall(c, p, regs, "addr:0x%llx", ARG0);
 }
 
 void
 handle_syscall__capget(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    
 }
 
 void

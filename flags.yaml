@@ -12,6 +12,7 @@ headers:
   - linux/fs.h
   - keyutils.h
   - asm/prctl.h
+  - linux/bpf.h
 groups:
   msg:
     flags:
@@ -403,3 +404,17 @@ groups:
           - ARCH_GET_FS
           - ARCH_SET_GS
           - ARCH_GET_GS
+
+  bpf_cmd:
+    exclusive:
+      - flags:
+          - BPF_MAP_CREATE
+          - BPF_MAP_LOOKUP_ELEM
+          - BPF_MAP_UPDATE_ELEM
+          - BPF_MAP_DELETE_ELEM
+          - BPF_MAP_GET_NEXT_KEY
+          - BPF_PROG_LOAD
+          - BPF_OBJ_PIN
+          - BPF_OBJ_GET
+          - BPF_PROG_ATTACH
+          - BPF_PROG_DETACH
