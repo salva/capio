@@ -81,6 +81,11 @@ proc_readlink(pid_t pid, const string &link) {
 }
 
 static string
+get_process_cwd(pid_t pid) {
+    return proc_readlink(pid, "cwd");
+}
+
+static string
 get_process_name(pid_t pid) {
     return proc_readlink(pid, "exe");
 }
@@ -156,6 +161,17 @@ Process::dup_fd(int oldfd, int newfd) {
 bool
 Process::dumping_fd(int fd) {
     return fdgroup(fd)->dumping;
+}
+
+string
+Process::resolve_path(const string &path) {
+    if ((path.length() > 0) && (path[0] == '/')) return path;
+
+    string cwd = get_process_cwd(pid);
+    size_t cwd_len = cwd.length();
+    if (cwd_len == 0) return path;
+    if (cwd[cwd_len - 1] == '/') return cwd + path;
+    return cwd + '/' + path;
 }
 
 bool
