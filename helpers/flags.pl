@@ -36,6 +36,12 @@ print $out_cc <<EOCC;
 #include "$to_h"
 EOCC
 
+for my $k (sort keys %{$data->{define}}) {
+    print $out_cc <<EOCC;
+#define $k $data->{define}{$k}
+EOCC
+}
+
 my $groups = $data->{groups};
 for my $name (sort keys %$groups) {
 

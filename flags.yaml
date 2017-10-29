@@ -13,6 +13,10 @@ headers:
   - keyutils.h
   - asm/prctl.h
   - linux/bpf.h
+  - sys/time.h
+
+define:
+  CLOCK_SGI_CYCLE: 10
 groups:
   msg:
     flags:
@@ -418,3 +422,26 @@ groups:
           - BPF_OBJ_GET
           - BPF_PROG_ATTACH
           - BPF_PROG_DETACH
+
+  clockid:
+    exclusive:
+      - flags:
+          - CLOCK_REALTIME
+          - CLOCK_MONOTONIC
+          - CLOCK_PROCESS_CPUTIME_ID
+          - CLOCK_THREAD_CPUTIME_ID
+          - CLOCK_MONOTONIC_RAW
+          - CLOCK_REALTIME_COARSE
+          - CLOCK_MONOTONIC_COARSE
+          - CLOCK_BOOTTIME
+          - CLOCK_REALTIME_ALARM
+          - CLOCK_BOOTTIME_ALARM
+          - CLOCK_SGI_CYCLE
+          - CLOCK_TAI
+
+  timer:
+    exclusive:
+      - flags:
+          - TIMER_ABSTIME
+
+

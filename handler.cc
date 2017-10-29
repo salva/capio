@@ -115,12 +115,43 @@ handle_pipe_pipe2(Capio &c, Process &p, struct user_regs_struct &regs) {
     }
 }
 
+#define handle_syscall_with_path(c, p, regs, fmt...)                    \
+    if (c.dumping(p, OP)) {                                             \
+        string abspath = (ARG0                                          \
+                          ? p.resolve_path(read_proc_c_string(p.pid, ARG0)) \
+                          : "NULL");                                    \
+        if (!ARG0 || c.dumping_path(abspath)) {                         \
+            if (!c.quiet) {                                             \
+                dump_syscall_wo_endl(c, p, regs, fmt);                  \
+                dual_ostream &out = c.out(p);                           \
+                out << ", path:";                                       \
+                if (ARG0)                                               \
+                    put_quoted(out, abspath);                           \
+                else                                                    \
+                    out << "NULL";                                      \
+                out << endl;                                            \
+            }                                                           \
+        }                                                               \
+    }                                                                   \
+    else ;
+
+
+
+#define handle_syscall_simple(c, p, regs, fmt ...)      \
+    if (c.dumping(p, OP))                               \
+        dump_syscall(c, p, regs, fmt);                  \
+    else;
+
+#define handle_syscall_fd(c, p, regs, fmt...)   \
+    if (c.dumping(p, OP, ARG0))                 \
+        dump_syscall(c, p, regs, fmt);          \
+    else;
+
 void
 handle_syscall___sysctl(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP))
-        dump_syscall(c, p, regs,
-                     "args:%s",
-                     read_proc_sysctl_args(p.pid, ARG0).c_str());
+    handle_syscall_simple(c, p, regs,
+                          "args:%s",
+                          read_proc_sysctl_args(p.pid, ARG0).c_str());
 }
 
 void
@@ -144,62 +175,33 @@ handle_syscall__accept4(Capio &c, Process &p, struct user_regs_struct &regs) {
 
 void
 handle_syscall__access(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP)) {
-        if (ARG0) {
-            string abspath = p.resolve_path(read_proc_c_string(p.pid, ARG0));
-            if (c.dumping_path(abspath)) {
-                dump_syscall_wo_endl(c, p, regs, "path:%s, mode:0%03o",
-                                     read_proc_c_string_quoted(p.pid, ARG0).c_str(),
-                                     ARG1);
-                dual_ostream &out = c.out(p);
-                out << "; path:";
-                put_quoted(out, abspath);
-                out << endl;
-            }
-        }
-        else {
-            dump_syscall(c, p, regs, "path:NULL");
-        }
-    }
+    handle_syscall_with_path(c, p, regs,
+                             "path:%s, mode:0%03o",
+                             read_proc_c_string_quoted(p.pid, ARG0).c_str(),
+                             ARG1);
 }
 
 void
 handle_syscall__acct(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP)) {
-        if (ARG0) {
-            dump_syscall(c, p, regs, "path:NULL");
-        }
-        else if (!c.quiet) {
-            string abspath = p.resolve_path(read_proc_c_string(p.pid, ARG0));
-            if (!ARG0 || c.dumping_path(abspath)) {
-                dump_syscall_wo_endl(c, p, regs, "path:%s",
-                                     read_proc_c_string_quoted(p.pid, ARG0).c_str());
-                dual_ostream &out = c.out(p);
-                out << "; path:";
-                put_quoted(out, abspath);
-                out << endl;
-            }
-        }
-    }
+    handle_syscall_with_path(c, p, regs,
+                             "path:%s",
+                             read_proc_c_string_quoted(p.pid, ARG0).c_str());
 }
 
 void
 handle_syscall__add_key(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP)) {
-        dump_syscall(c, p, regs,
-                     "type:%s, description:%s, payload:%s, keyring:%s",
-                     read_proc_c_string_quoted(p.pid, ARG0).c_str(),
-                     read_proc_c_string_quoted(p.pid, ARG1).c_str(),
-                     read_proc_string_quoted(p.pid, ARG2, ARG3).c_str(),
-                     key_spec_flags2string(ARG4).c_str());
-    }
+    handle_syscall_simple(c, p, regs,
+                          "type:%s, description:%s, payload:%s, keyring:%s",
+                          read_proc_c_string_quoted(p.pid, ARG0).c_str(),
+                          read_proc_c_string_quoted(p.pid, ARG1).c_str(),
+                          read_proc_string_quoted(p.pid, ARG2, ARG3).c_str(),
+                          key_spec_flags2string(ARG4).c_str());
 }
 
 void
 handle_syscall__adjtimex(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP))
         // FIXME: read and dump the timex structure both at syscall enter and exit
-        dump_syscall(c, p, regs, "tcx_p:0x%x", ARG0);
+    handle_syscall_simple(c, p, regs, "tcx_p:0x%x", ARG0);
 }
 
 void
@@ -210,8 +212,7 @@ handle_syscall__afs_syscall(Capio &c, Process &p, struct user_regs_struct &regs)
 
 void
 handle_syscall__alarm(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP))
-        dump_syscall(c, p, regs, "seconds:%lld", ARG0);
+    handle_syscall_simple(c, p, regs, "seconds:%lld", ARG0);
 }
 
 void
@@ -239,81 +240,128 @@ handle_syscall__arch_prctl(Capio &c, Process &p, struct user_regs_struct &regs) 
 
 void
 handle_syscall__bind(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs,
-                     "fd:%lld, addr:%s",
-                     ARG0, read_proc_sockaddr(p.pid, ARG1, ARG2).c_str());
+    handle_syscall_fd(c, p, regs, 
+                      "fd:%lld, addr:%s",
+                      ARG0, read_proc_sockaddr(p.pid, ARG1, ARG2).c_str());
 }
 
 void
 handle_syscall__bpf(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP))
-        // FIXME: implement proper dumping of this syscall
-        dump_syscall(c, p, regs,
-                     "cmd:%s, attr:%s",
-                     bpf_cmd_flags2string(ARG0).c_str(),
-                     read_proc_string_quoted(p.pid, ARG1, ARG2).c_str());
+    // FIXME: implement proper dumping of this syscall
+    handle_syscall_simple(c, p, regs,
+                          "cmd:%s, attr:%s",
+                          bpf_cmd_flags2string(ARG0).c_str(),
+                          read_proc_string_quoted(p.pid, ARG1, ARG2).c_str());
 }
 
 void
 handle_syscall__brk(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP))
-        dump_syscall(c, p, regs, "addr:0x%llx", ARG0);
+    handle_syscall_simple(c, p, regs, "addr:0x%llx", ARG0);
 }
 
 void
 handle_syscall__capget(Capio &c, Process &p, struct user_regs_struct &regs) {
-    
+    handle_syscall_simple(c, p, regs,
+                          "hdr:%s, data:%s",
+                          read_proc_user_cap_header(p.pid, ARG0).c_str(),
+                          read_proc_user_cap_data(p.pid, ARG1).c_str());
 }
 
 void
 handle_syscall__capset(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    handle_syscall_simple(c, p, regs,
+                          "hdr:%s, data:%s",
+                          read_proc_user_cap_header(p.pid, ARG0).c_str(),
+                          read_proc_user_cap_data(p.pid, ARG1).c_str());
 }
 
 void
 handle_syscall__chdir(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP)) {
+        string cwd = get_process_cwd(p.pid);
+        if ((ARG0 && c.dumping_path(p.enter_arg0)) ||
+            c.dumping_path(p.enter_cwd) ||
+            c.dumping_path(cwd)) {
+            if (!c.quiet) {
+                dump_syscall_wo_endl(c, p, regs, "name:%s", read_proc_c_string_quoted(p.pid, ARG0).c_str());
+                dual_ostream &out = c.out(p);
+                out <<"; path:";
+                if (ARG0)
+                    put_quoted(out, p.enter_arg0);
+                else
+                    out << "NULL";
+                out <<", old_cwd:";
+                put_quoted(out, p.enter_cwd);
+                out <<", new_cwd:";
+                put_quoted(out, cwd);
+                out << endl;
+            }
+        }
+    }
 }
 
 void
 handle_syscall__chmod(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    handle_syscall_with_path(c, p, regs,
+                             "path:%s, mode:0%03o",
+                             read_proc_c_string_quoted(p.pid, ARG0).c_str(),
+                             ARG1);
 }
 
 void
 handle_syscall__chown(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    handle_syscall_with_path(c, p, regs,
+                             "path:%s, owner:%lld, group:%lld",
+                             read_proc_c_string_quoted(p.pid, ARG0), ARG1, ARG2);
 }
 
 void
 handle_syscall__chroot(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    // FIXME: chroot needs a deeper analysis!
+    handle_syscall_with_path(c, p, regs,
+                             read_proc_c_string_quoted(p.pid, ARG0).c_str());
 }
 
 void
 handle_syscall__clock_adjtime(Capio &c, Process &p, struct user_regs_struct &regs) {
+    // FIXME: dump struct timex correctly
+    handle_syscall_simple(c, p, regs,
+                          "which_clock:%s, tx:0x%llx",
+                          clockid_flags2string(ARG0).c_str(),
+                          ARG1);
+}
 
+void
+handle_syscall_clock(Capio &c, Process &p, struct user_regs_struct &regs) {
+    handle_syscall_simple(c, p, regs,
+                          "which_clock:%s, t:%s",
+                          clockid_flags2string(ARG0).c_str(),
+                          read_proc_timespec(p.pid, ARG1).c_str());
 }
 
 void
 handle_syscall__clock_getres(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    handle_syscall_clock(c, p, regs);
 }
 
 void
 handle_syscall__clock_gettime(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    handle_syscall_clock(c, p, regs);
 }
 
 void
 handle_syscall__clock_nanosleep(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    handle_syscall_simple(c, p, regs,
+                          "clock_id:%s, flags:%s, request:%s, remain:%s",
+                          clockid_flags2string(ARG0).c_str(),
+                          timer_flags2string(ARG1).c_str(),
+                          read_proc_timespec(p.pid, ARG2).c_str(),
+                          read_proc_timespec(p.pid, ARG3).c_str());
 }
 
 void
 handle_syscall__clock_settime(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    handle_syscall_clock(c, p, regs);
 }
 
 void
@@ -330,33 +378,47 @@ handle_syscall__clone(Capio &c, Process &p, struct user_regs_struct &regs) {
 
 void
 handle_syscall__close(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld", ARG0);
+    handle_syscall_fd(c, p, regs, "fd:%lld", ARG0);
     p.close_fd(ARG0);
 }
 
 void
 handle_syscall__connect(Capio &c, Process &p, struct user_regs_struct &regs) {
-    if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs,
-                     "fd:%lld, addr:%s",
-                     ARG0, read_proc_sockaddr(p.pid, ARG1, ARG2).c_str());
+    handle_syscall_fd(c, p, regs,
+                      "fd:%lld, addr:%s",
+                      ARG0, read_proc_sockaddr(p.pid, ARG1, ARG2).c_str());
     p.close_fd(ARG0);
 }
 
 void
 handle_syscall__copy_file_range(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP, ARG0, ARG2)) {
+        dump_syscall(c, p, regs,
+                     "fd_in:%d, off_in:%s, fd_out:%d, off_out:%s, len:%lld, flags:0x%llx",
+                     read_proc_off_t(p.pid, ARG1).c_str(),
+                     read_proc_off_t(p.pid, ARG3).c_str(),
+                     ARG4, ARG5);
+    }
 }
 
 void
 handle_syscall__creat(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP)) {
+        string abspath = (ARG0
+                          ? p.resolve_path(read_proc_c_string(p.pid, ARG0))
+                          : "NULL");
+        if (!ARG0 || c.dumping_path(abspath) || p.dumping_fd(RC)) {
+            dump_syscall(c, p, regs,
+                         "path:%s, mode:%03llo",
+                         read_proc_c_string(p.pid, ARG0).c_str(),
+                         ARG1);
+        }
+    }
 }
 
 void
 handle_syscall__create_module(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    // FIXME: dump obsolete syscall
 }
 
 void
@@ -373,6 +435,7 @@ handle_syscall__dup(Capio &c, Process &p, struct user_regs_struct &regs) {
 
 void
 handle_syscall__dup2(Capio &c, Process &p, struct user_regs_struct &regs) {
+    // FIXME: check if we were dumping old fd
     c.dup_fd(p, ARG0, ARG1);
     if (c.dumping(p, OP, ARG0, RC))
         dump_syscall(c, p, regs, "oldfd:%lld, newfd:%lld", ARG0, ARG1);
@@ -381,6 +444,7 @@ handle_syscall__dup2(Capio &c, Process &p, struct user_regs_struct &regs) {
 
 void
 handle_syscall__dup3(Capio &c, Process &p, struct user_regs_struct &regs) {
+    // FIXME: check if we were dumping old fd
     c.dup_fd(p, ARG0, ARG1);
     if (c.dumping(p, OP, ARG0, RC))
         dump_syscall(c, p, regs, "oldfd:%lld, newfd:%lld, flags:%s",
@@ -1132,17 +1196,20 @@ handle_syscall__nfsservctl(Capio &c, Process &p, struct user_regs_struct &regs) 
 void
 handle_syscall__open(Capio &c, Process &p, struct user_regs_struct &regs) {
     p.close_fd(RC);
-    if (c.dumping(p, OP,RC)) {
-        if (!c.quiet) {
-            dump_syscall_wo_endl(c, p, regs,
-                                 "filename:%s, flags:%s, mode:0%03llo",
-                                 read_proc_c_string_quoted(p.pid, ARG0).c_str(),
-                                 o_flags2string(ARG1).c_str(),
-                                 ARG2);
-            dual_ostream &out = c.out(p);
-            out << "; path:";
-            put_quoted(out, p.fd_path(RC));
-            out << endl;
+    if (c.dumping(p, OP)) {
+        string abspath = (ARG0 ? read_proc_c_string(p.pid, ARG0) : "NULL");
+        if (p.dumping_fd(RC) || (ARG0 && c.dumping_path(abspath))) {
+            if (!c.quiet) {
+                dump_syscall_wo_endl(c, p, regs,
+                                     "filename:%s, flags:%s, mode:0%03llo",
+                                     read_proc_c_string_quoted(p.pid, ARG0).c_str(),
+                                     o_flags2string(ARG1).c_str(),
+                                     ARG2);
+                dual_ostream &out = c.out(p);
+                out << "; path:";
+                put_quoted(out, (RC < 0 ? abspath : p.fd_path(RC)));
+                out << endl;
+            }
         }
     }
 }

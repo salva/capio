@@ -80,7 +80,7 @@ proc_readlink(pid_t pid, const string &link) {
     return buffer;
 }
 
-static string
+string
 get_process_cwd(pid_t pid) {
     return proc_readlink(pid, "cwd");
 }
@@ -454,6 +454,11 @@ main(int argc, char *argv[], char *env[]) {
                               pid, OP, RC, ARG0, ARG1, ARG2, ARG3, ARG4, ARG5);
 
                         switch(OP) {
+                        case SYS_chdir:
+                            if (ARG0)
+                                p.enter_arg0 = p.resolve_path(read_proc_c_string(pid, ARG0));
+                            p.enter_cwd = get_process_cwd(pid);
+                            break;
                         case SYS_execve:
                             /* execve arguments are missing once execve returns so, we save them here */
                             stringstream ss;

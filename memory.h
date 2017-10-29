@@ -17,3 +17,7 @@ std::string read_proc_array_c_string_quoted(pid_t pid, long long mem);
 void read_proc_struct(pid_t pid, long long mem, size_t len, void *to);
 std::string read_proc_sysctl_args(pid_t pid, long long mem);
 std::string read_proc_c_string(pid_t pid, long long mem, size_t maxlen = 16384);
+std::string read_proc_user_cap_header(pid_t pid, long long mem);
+std::string read_proc_user_cap_data(pid_t pid, long long mem);
+std::string read_proc_timeval(pid_t pid, long long mem);
+std::string read_proc_timespec(pid_t pid, long long mem);

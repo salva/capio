@@ -1,4 +1,6 @@
 #include <sys/ptrace.h>
+#include <linux/capability.h>
+
 #include "memory.h"
 #include "util.h"
 #include "sockaddr.h"
@@ -112,9 +114,27 @@ read_proc_sockaddr(pid_t pid, long long mem, size_t len) {
         auto data = (struct sockaddr *)read_proc_mem(pid, mem, len);
         return sockaddr2string(data, len);
     }
-    else {
-        return "NULL";
+    return "NULL";
+}
+
+string
+read_proc_user_cap_header(pid_t pid, long long mem) {
+    if (mem) {
+        auto header = (struct __user_cap_header_struct *)read_proc_mem(pid, mem, sizeof(struct __user_cap_header_struct));
+        return "{version:" + to_string(header->version) + ", pid:" + to_string(header->pid) + "}";
     }
+    return "NULL";
+}
+
+string
+read_proc_user_cap_data(pid_t pid, long long mem) {
+    if (mem) {
+        auto data = (struct __user_cap_data_struct *)read_proc_mem(pid, mem, sizeof(struct __user_cap_data_struct));
+        return ("{effective:" + to_string(data->effective) +
+                ", permitted:" + to_string(data->permitted) +
+                ", inheritable:" + to_string(data->inheritable) + "}");
+    }
+    return "NULL";
 }
 
 string
@@ -210,6 +230,30 @@ read_proc_sysctl_args(pid_t pid, long long mem) {
            << ", newval:" << read_proc_string_quoted(pid, (long long)args.newval, args.newlen)
            << "}";
         return ss.str();
+    }
+    return "NULL";
+}
+
+string
+read_proc_timeval(pid_t pid, long long mem) {
+    if (mem) {
+        struct timeval tv;
+        char buffer[60];
+        read_proc_struct(pid, mem, sizeof(tv), &tv);
+        sprintf(buffer, "%llu.%06llu", (unsigned long long)tv.tv_sec, (unsigned long long)tv.tv_usec);
+        return buffer;
+    }
+    return "NULL";
+}
+
+string
+read_proc_timespec(pid_t pid, long long mem) {
+    if (mem) {
+        struct timespec ts;
+        char buffer[60];
+        read_proc_struct(pid, mem, sizeof(ts), &ts);
+        sprintf(buffer, "%llu.%09llu", (unsigned long long)ts.tv_sec, (unsigned long long)ts.tv_nsec);
+        return buffer;
     }
     return "NULL";
 }
