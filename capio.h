@@ -13,9 +13,12 @@ std::string get_process_cwd(pid_t pid);
 
 struct FDGroup {
     std::forward_list<int> fds;
-    bool dumping;
     std::string path;
+    bool path_is_valid;
+    bool dumping;
+
     FDGroup(int fd, std::string path_);
+    FDGroup(int fd, std::string path_, bool path_is_valid = true);
     void add_fd(int fd);
     void rm_fd(int fd);
     bool empty();
@@ -28,8 +31,9 @@ struct Process {
     bool sigcall_exiting;
     std::string process_name;
     std::string enter_args;
-    std::string enter_cwd;
-    std::string enter_arg0;
+    std::string enter_cwd; // or enter_at
+    std::string enter_arg0; // or enter_abspath
+    std::string enter_abspath;
     struct user_regs_struct enter_regs;
     dual_ostream *out;
 
@@ -41,8 +45,9 @@ struct Process {
     void close_fd(int fd);
     bool dumping_fd(int fd);
     void reset_process_name();
-    const std::string &fd_path(int fd);
+    const std::string fd_path(int fd, bool *valid = NULL);
     std::string resolve_path(const std::string &path);
+    std::string resolve_path(const std::string &path, const std::string &base);
 
 private:
     std::unordered_map<int,FDGroup*> fdgroups;

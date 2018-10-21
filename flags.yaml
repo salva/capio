@@ -2,9 +2,7 @@ headers:
   - sys/types.h
   - sys/socket.h
   - sys/stat.h
-  - asm/mman.h
-  - sys/mman.h
-  - fcntl.h
+  - linux/mman.h
   - sys/file.h
   - sys/inotify.h
   - sys/xattr.h
@@ -14,6 +12,8 @@ headers:
   - asm/prctl.h
   - linux/bpf.h
   - sys/time.h
+  - sys/eventfd.h
+  - sys/epoll.h
 
 define:
   CLOCK_SGI_CYCLE: 10
@@ -444,4 +444,38 @@ groups:
       - flags:
           - TIMER_ABSTIME
 
+  epoll_create:
+    flags:
+      - EPOLL_CLOEXEC
+
+  epoll_ctl:
+    exclusive:
+      - flags:
+          - EPOLL_CTL_ADD
+          - EPOLL_CTL_DEL
+          - EPOLL_CTL_MOD
+
+  epoll:
+    flags:
+      - EPOLLIN
+      - EPOLLPRI
+      - EPOLLOUT
+      - EPOLLERR
+      - EPOLLHUP
+      - EPOLLRDNORM
+      - EPOLLRDBAND
+      - EPOLLWRNORM
+      - EPOLLWRBAND
+      - EPOLLMSG
+      - EPOLLRDHUP
+      - EPOLLEXCLUSIVE
+      - EPOLLWAKEUP
+      - EPOLLONESHOT
+      - EPOLLET
+
+  eventfd:
+    flags:
+      - EFD_SEMAPHORE
+      - EFD_CLOEXEC
+      - EFD_NONBLOCK
 

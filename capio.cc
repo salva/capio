@@ -71,12 +71,18 @@ match_fn_patterns(const forward_list<string> &patterns, const string &target) {
 }
 
 static string
-proc_readlink(pid_t pid, const string &link) {
+proc_readlink(pid_t pid, const string &link, bool *exists = NULL) {
     char buffer[PATH_MAX+2];
     string path = "/proc/" + to_string(pid) + "/" + link;
     size_t len = readlink(path.c_str(), buffer, PATH_MAX);
-    if (len < 0) return "???";
+    if (len < 0) {
+	return "???";
+	if (exists)
+	    *exists = false;
+    }
     buffer[len] = '\0';
+    if (exists)
+	*exists = true;
     return buffer;
 }
 
@@ -91,7 +97,7 @@ get_process_name(pid_t pid) {
 }
 
 static string
-get_process_filename(pid_t pid, int fd) {
+get_process_filename(pid_t pid, int fd, bool *exists = NULL) {
     return proc_readlink(pid, "fd/" + to_string(fd));
 }
 
@@ -115,12 +121,23 @@ Process::reset_process_name() {
     debug(2, "process name for pid %d is %s, dumping is %d\n", pid, process_name.c_str(), (int)dumping);
 }
 
-const string&
-Process::fd_path(int fd) {
-    return fdgroup(fd)->path;
+const string
+Process::fd_path(int fd, bool *exists) {
+    if (fd == AT_FDCWD)
+	return get_process_cwd(pid);
+    FDGroup *grp = fdgroup(fd);
+    if (grp) {
+	if (exists) *exists = grp->path_is_valid;
+	return grp->path;
+    }
+    else {
+	if (exists) *exists = false;
+	return "!!?";
+    }
 }
 
-FDGroup::FDGroup(int fd, string path_) : path(path_) {
+FDGroup::FDGroup(int fd, string path_, bool path_is_valid_) :
+    path(path_), path_is_valid(path_is_valid_) {
     fds.push_front(fd);
     debug(4, "checking dumping for fd %d, empty: %d, dumping_fd[%d] = %d",
           fd, dumping_fds.empty(), fd, dumping_fds.count(fd));
@@ -130,9 +147,13 @@ FDGroup::FDGroup(int fd, string path_) : path(path_) {
 
 FDGroup *
 Process::fdgroup(int fd) {
+    if (fd < 0) return NULL;
     FDGroup *grp = fdgroups[fd];
-    if (!grp)
-        fdgroups[fd] = grp = new FDGroup(fd, get_process_filename(pid, fd));
+    if (!grp) {
+	bool path_is_valid;
+	string path = get_process_filename(pid, fd, &path_is_valid);
+	fdgroups[fd] = grp = new FDGroup(fd, path, path_is_valid);
+    }
     return grp;
 }
 
@@ -160,18 +181,28 @@ Process::dup_fd(int oldfd, int newfd) {
 
 bool
 Process::dumping_fd(int fd) {
-    return fdgroup(fd)->dumping;
+    FDGroup *grp = fdgroup(fd);
+    return (grp ? grp->dumping : false);
+}
+
+static string
+join_path(const string &base, const string &path) {
+    size_t base_len = base.length();
+    if (base_len == 0) return path;
+    if (base[base_len - 1] == '/') return base + path;
+    return base + "/" + path;
 }
 
 string
 Process::resolve_path(const string &path) {
     if ((path.length() > 0) && (path[0] == '/')) return path;
+    return join_path(get_process_cwd(pid), path);
+}
 
-    string cwd = get_process_cwd(pid);
-    size_t cwd_len = cwd.length();
-    if (cwd_len == 0) return path;
-    if (cwd[cwd_len - 1] == '/') return cwd + path;
-    return cwd + '/' + path;
+string
+Process::resolve_path(const string &path, const string &base) {
+    if ((path.length() > 0) && (path[0] == '/')) return path;
+    return join_path(resolve_path(base), path);
 }
 
 bool
@@ -459,16 +490,29 @@ main(int argc, char *argv[], char *env[]) {
                                 p.enter_arg0 = p.resolve_path(read_proc_c_string(pid, ARG0));
                             p.enter_cwd = get_process_cwd(pid);
                             break;
-                        case SYS_execve:
-                            /* execve arguments are missing once execve returns so, we save them here */
+                        case SYS_execve: {
+                            /* execve arguments are missing once
+			     * execve returns so, we save them here */
                             stringstream ss;
                             ss << "name:" << read_proc_c_string_quoted(pid, ARG0)
                                << ", args:" << read_proc_array_c_string_quoted(pid, ARG1)
                                << ", env:" << read_proc_array_c_string_quoted(pid, ARG2);
                             p.enter_args = ss.str();
                             break;
+			}
+			case SYS_execveat: {
+			    stringstream ss;
+			    ss << "dfd:" << SAFD0
+			       << "name:" << read_proc_c_string_quoted(pid, ARG1)
+			       << ", args:" << read_proc_array_c_string_quoted(pid, ARG2)
+			       << ", env:" << read_proc_array_c_string_quoted(pid, ARG3);
+			    p.enter_args = ss.str();
+
+			    p.enter_cwd = p.fd_path(AFD0);
+			    break;
                         }
-                    }
+			}
+		    }
                 }
                 ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
                 continue;

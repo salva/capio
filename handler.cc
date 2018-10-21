@@ -17,7 +17,7 @@ using namespace std;
 static void
 handle_read_write(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0)) {
-        dump_syscall(c, p, regs, "fd:%lld", ARG0);
+        dump_syscall(c, p, regs, "fd:%s", SAFD0);
         dump_io(c, p, regs, ARG1, RC);
     }
 }
@@ -25,7 +25,7 @@ handle_read_write(Capio &c, Process &p, struct user_regs_struct &regs) {
 static void
 handle_readv_writev(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0)) {
-        dump_syscall(c, p, regs, "fd:%lld", ARG0);
+        dump_syscall(c, p, regs, "fd:%s", SAFD0);
         dump_iov(c, p, regs, ARG1, ARG2);
     }
 }
@@ -34,8 +34,8 @@ static void
 handle_recvfrom_sendto(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0)) {
         dump_syscall(c, p, regs,
-                     "fd:%lld, flags:%s",
-                     ARG0, msg_flags2string(ARG3).c_str());
+                     "fd:%s, flags:%s",
+                     SAFD0, msg_flags2string(ARG3).c_str());
         dump_io(c, p, regs, ARG1, RC);
     }
 }
@@ -46,8 +46,8 @@ handle_recvmsg_sendmsg(Capio &c, Process &p, struct user_regs_struct &regs) {
         struct msghdr msg;
         read_proc_struct(p.pid, ARG1, sizeof(msg), (void*)&msg);
         dump_syscall(c, p, regs,
-                     "fd:%lld, name:%s, iovlen:%lld, control:%s",
-                     ARG0,
+                     "fd:%s, name:%s, iovlen:%lld, control:%s",
+                     SAFD0,
                      read_proc_string_quoted(p.pid, (long long)msg.msg_name,
                                              msg.msg_namelen).c_str(),
                      msg.msg_iovlen,
@@ -60,7 +60,7 @@ handle_recvmsg_sendmsg(Capio &c, Process &p, struct user_regs_struct &regs) {
 static void
 handle_pread64_pwrite64(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0)) {
-        dump_syscall(c, p, regs, "fd:%lld, pos:%lld", ARG0, ARG3);
+        dump_syscall(c, p, regs, "fd:%s, pos:%lld", SAFD0, ARG3);
         dump_io(c, p, regs, ARG1, RC);
     }
 }
@@ -69,8 +69,8 @@ static void
 handle_preadv_pwritev(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0)) {
         dump_syscall(c, p, regs,
-                     "fd:%lld, pos:%lld (l:%lld, h:%ldd)",
-                     ARG0, ARG3 + (ARG4 << 32), ARG3, ARG4);
+                     "fd:%s, pos:%lld (l:%lld, h:%ldd)",
+                     SAFD0, ARG3 + (ARG4 << 32), ARG3, ARG4);
         dump_iov(c, p, regs, ARG1, ARG2);
     }
 }
@@ -79,8 +79,8 @@ static void
 handle_preadv2_pwritev2(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0)) {
         dump_syscall(c, p, regs,
-                     "fd:%lld, pos:%lld (l:%lld, h:%ldd), flags:%s",
-                     ARG0, ARG3 + (ARG4 << 32), ARG3, ARG4,
+                     "fd:%s, pos:%lld (l:%lld, h:%ldd), flags:%s",
+                     SAFD0, ARG3 + (ARG4 << 32), ARG3, ARG4,
                      rwf_flags2string(ARG5).c_str());
         dump_iov(c, p, regs, ARG1, ARG2);
     }
@@ -136,7 +136,6 @@ handle_pipe_pipe2(Capio &c, Process &p, struct user_regs_struct &regs) {
     else ;
 
 
-
 #define handle_syscall_simple(c, p, regs, fmt ...)      \
     if (c.dumping(p, OP))                               \
         dump_syscall(c, p, regs, fmt);                  \
@@ -158,8 +157,8 @@ void
 handle_syscall__accept(Capio &c, Process &p, struct user_regs_struct &regs) {
     p.close_fd(RC);
     if (c.dumping(p, OP, ARG0, RC))
-        dump_syscall(c, p, regs, "fd:%lld, addr:%s",
-                     ARG0,
+        dump_syscall(c, p, regs, "fd:%s, addr:%s",
+                     SAFD0,
                      read_proc_sockaddr(p.pid, ARG1, ARG2).c_str());
 }
 
@@ -167,8 +166,8 @@ void
 handle_syscall__accept4(Capio &c, Process &p, struct user_regs_struct &regs) {
     p.close_fd(RC);
     if (c.dumping(p, OP, ARG0, RC))
-        dump_syscall(c, p, regs, "fd:%lld, addr:%s, flags:%s",
-                     ARG0,
+        dump_syscall(c, p, regs, "fd:%s, addr:%s, flags:%s",
+                     SAFD0,
                      read_proc_sockaddr(p.pid, ARG1, ARG2).c_str(),
                      sock_flags2string(ARG3).c_str());
 }
@@ -241,8 +240,8 @@ handle_syscall__arch_prctl(Capio &c, Process &p, struct user_regs_struct &regs) 
 void
 handle_syscall__bind(Capio &c, Process &p, struct user_regs_struct &regs) {
     handle_syscall_fd(c, p, regs, 
-                      "fd:%lld, addr:%s",
-                      ARG0, read_proc_sockaddr(p.pid, ARG1, ARG2).c_str());
+                      "fd:%s, addr:%s",
+                      SAFD0, read_proc_sockaddr(p.pid, ARG1, ARG2).c_str());
 }
 
 void
@@ -378,15 +377,15 @@ handle_syscall__clone(Capio &c, Process &p, struct user_regs_struct &regs) {
 
 void
 handle_syscall__close(Capio &c, Process &p, struct user_regs_struct &regs) {
-    handle_syscall_fd(c, p, regs, "fd:%lld", ARG0);
+    handle_syscall_fd(c, p, regs, "fd:%s", SAFD0);
     p.close_fd(ARG0);
 }
 
 void
 handle_syscall__connect(Capio &c, Process &p, struct user_regs_struct &regs) {
     handle_syscall_fd(c, p, regs,
-                      "fd:%lld, addr:%s",
-                      ARG0, read_proc_sockaddr(p.pid, ARG1, ARG2).c_str());
+                      "fd:%s, addr:%s",
+                      SAFD0, read_proc_sockaddr(p.pid, ARG1, ARG2).c_str());
     p.close_fd(ARG0);
 }
 
@@ -430,7 +429,7 @@ void
 handle_syscall__dup(Capio &c, Process &p, struct user_regs_struct &regs) {
     c.dup_fd(p, ARG0, RC);
     if (c.dumping(p, OP, ARG0, RC))
-        dump_syscall(c, p, regs, "fd:%lld", ARG0);
+        dump_syscall(c, p, regs, "fd:%s", SAFD0);
 }
 
 void
@@ -438,7 +437,7 @@ handle_syscall__dup2(Capio &c, Process &p, struct user_regs_struct &regs) {
     // FIXME: check if we were dumping old fd
     c.dup_fd(p, ARG0, ARG1);
     if (c.dumping(p, OP, ARG0, RC))
-        dump_syscall(c, p, regs, "oldfd:%lld, newfd:%lld", ARG0, ARG1);
+        dump_syscall(c, p, regs, "oldfd:%s, newfd:%s", SAFD0, SAFD1);
 
 }
 
@@ -447,53 +446,75 @@ handle_syscall__dup3(Capio &c, Process &p, struct user_regs_struct &regs) {
     // FIXME: check if we were dumping old fd
     c.dup_fd(p, ARG0, ARG1);
     if (c.dumping(p, OP, ARG0, RC))
-        dump_syscall(c, p, regs, "oldfd:%lld, newfd:%lld, flags:%s",
-                     ARG0, ARG1, o_flags2string(ARG2).c_str());
+        dump_syscall(c, p, regs, "oldfd:%s, newfd:%s, flags:%s",
+                     SAFD0, SAFD1, o_flags2string(ARG2).c_str());
 }
 
 void
 handle_syscall__epoll_create(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    p.close_fd(RC);
+    if (c.dumping(p, OP, RC))
+	dump_syscall(c, p, regs, "size:%lld", ARG0);
 }
 
 void
 handle_syscall__epoll_create1(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    p.close_fd(RC);
+    if (c.dumping(p, OP, RC))
+	dump_syscall(c, p, regs, "flags:%s",
+		     epoll_create_flags2string(ARG0));
 }
 
 void
 handle_syscall__epoll_ctl(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP, ARG0, ARG2))
+	dump_syscall(c, p, regs, "epfd:%s, op:%s, fd:%s, event:%p",
+		     SAFD0,
+		     epoll_ctl_flags2string(ARG1),
+		     SAFD2,
+		     ARG3);
 }
 
 void
 handle_syscall__epoll_ctl_old(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP))
+        dump_syscall_unimplemented(c, p, regs);
 }
 
 void
 handle_syscall__epoll_pwait(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP, ARG0))
+	dump_syscall(c, p, regs,
+		     "epfd:%s, events:%p, maxevents:%lld, "
+		     "timeout:%lld, sigmask:%p, sigsetsize:%ldd",
+		     SAFD0, ARG1, ARG2, ARG3, ARG4, ARG5);
 }
 
 void
 handle_syscall__epoll_wait(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP, ARG0))
+	dump_syscall(c, p, regs, "epfd:%s, events:%p, maxevents:%lld, timeout:%lld",
+		     SAFD0, ARG1, ARG2, ARG3);
 }
 
 void
 handle_syscall__epoll_wait_old(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP))
+        dump_syscall_unimplemented(c, p, regs);
 }
 
 void
 handle_syscall__eventfd(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP, RC))
+	dump_syscall(c, p, regs, "initval:%lld", ARG0);
 }
 
 void
 handle_syscall__eventfd2(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    if (c.dumping(p, OP, RC))
+	dump_syscall(c, p, regs, "initval:%lld, flags:%s",
+		     ARG0,
+		     eventfd_flags2string(ARG1));
 }
 
 void
@@ -511,7 +532,18 @@ handle_syscall__execve(Capio &c, Process &p, struct user_regs_struct &regs) {
 
 void
 handle_syscall__execveat(Capio &c, Process &p, struct user_regs_struct &regs) {
-
+    bool was_dumping = c.dumping(p, OP);
+    p.reset_process_name();
+    if (!c.quiet && (was_dumping || c.dumping(p, OP))) {
+	dump_syscall_wo_endl(c, p, regs, "%s", p.enter_args.c_str());
+    }
+    // handle_syscall_with_path_at(c, p, regs, "");
+    
+    // p.close(RC);
+    // if (p.dumping(p, OP, ARG0, RC))
+    // 	dump_syscall_with_path_at(c, p, regs,
+    // 				  "dfd:%s, filename:%s, argv:%p, envp:%p, flags:%ldd",
+    // 				  SAFD0, 
 }
 
 void
@@ -533,8 +565,8 @@ void
 handle_syscall__fadvise64(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
         dump_syscall(c, p, regs,
-                     "fd:%lld, offset:%lld, len:%lld, advice:%s",
-                     ARG0, ARG1, ARG2,
+                     "fd:%s, offset:%lld, len:%lld, advice:%s",
+                     SAFD0, ARG1, ARG2,
                      posix_fadv_flags2string(ARG3).c_str());
 }
 
@@ -556,13 +588,13 @@ handle_syscall__fanotify_mark(Capio &c, Process &p, struct user_regs_struct &reg
 void
 handle_syscall__fchdir(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld", ARG0);
+        dump_syscall(c, p, regs, "fd:%s", SAFD0);
 }
 
 void
 handle_syscall__fchmod(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, mode:0%llo", ARG0, ARG1);
+        dump_syscall(c, p, regs, "fd:%s, mode:0%llo", SAFD0, ARG1);
 }
 
 void
@@ -573,7 +605,7 @@ handle_syscall__fchmodat(Capio &c, Process &p, struct user_regs_struct &regs) {
 void
 handle_syscall__fchown(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, user:%lld, group:%lld", ARG0, ARG1, ARG2);
+        dump_syscall(c, p, regs, "fd:%s, user:%lld, group:%lld", SAFD0, ARG1, ARG2);
 }
 
 void
@@ -589,13 +621,13 @@ handle_syscall__fcntl(Capio &c, Process &p, struct user_regs_struct &regs) {
 void
 handle_syscall__fdatasync(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld", ARG0);
+        dump_syscall(c, p, regs, "fd:%s", SAFD0);
 }
 
 void
 handle_syscall__fgetxattr(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, ...", ARG0);
+        dump_syscall(c, p, regs, "fd:%s, ...", SAFD0);
 }
 
 void
@@ -611,7 +643,7 @@ handle_syscall__flistxattr(Capio &c, Process &p, struct user_regs_struct &regs) 
 void
 handle_syscall__flock(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, operation:%s", ARG0,
+        dump_syscall(c, p, regs, "fd:%s, operation:%s", SAFD0,
                      lock_flags2string(ARG1).c_str());
 }
 
@@ -623,14 +655,14 @@ handle_syscall__fork(Capio &c, Process &p, struct user_regs_struct &regs) {
 void
 handle_syscall__fremovexattr(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, ...", ARG0);
+        dump_syscall(c, p, regs, "fd:%s, ...", SAFD0);
 
 }
 
 void
 handle_syscall__fsetxattr(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, ...", ARG0);
+        dump_syscall(c, p, regs, "fd:%s, ...", SAFD0);
 }
 
 void
@@ -641,19 +673,19 @@ handle_syscall__fstat(Capio &c, Process &p, struct user_regs_struct &regs) {
 void
 handle_syscall__fstatfs(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, buf:...", ARG0);
+        dump_syscall(c, p, regs, "fd:%s, buf:...", SAFD0);
 }
 
 void
 handle_syscall__fsync(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld", ARG0);
+        dump_syscall(c, p, regs, "fd:%s", SAFD0);
 }
 
 void
 handle_syscall__ftruncate(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, length:%lld", ARG0, ARG1);
+        dump_syscall(c, p, regs, "fd:%s, length:%lld", SAFD0, ARG1);
 }
 
 void
@@ -699,13 +731,13 @@ handle_syscall__getcwd(Capio &c, Process &p, struct user_regs_struct &regs) {
 void
 handle_syscall__getdents(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, dirents:[...]", ARG0);
+        dump_syscall(c, p, regs, "fd:%s, dirents:[...]", SAFD0);
 }
 
 void
 handle_syscall__getdents64(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, dirents:[...]", ARG0);
+        dump_syscall(c, p, regs, "fd:%s, dirents:[...]", SAFD0);
 }
 
 void
@@ -836,8 +868,8 @@ handle_syscall__init_module(Capio &c, Process &p, struct user_regs_struct &regs)
 void
 handle_syscall__inotify_add_watch(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, path:%s, mask:%s",
-                     ARG0,
+        dump_syscall(c, p, regs, "fd:%s, path:%s, mask:%s",
+                     SAFD0,
                      read_proc_c_string_quoted(p.pid, ARG1).c_str(),
                      in_flags2string(ARG2).c_str());
 }
@@ -859,7 +891,7 @@ handle_syscall__inotify_init1(Capio &c, Process &p, struct user_regs_struct &reg
 void
 handle_syscall__inotify_rm_watch(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, wd:%lld", ARG0, ARG1);
+        dump_syscall(c, p, regs, "fd:%s, wd:%lld", SAFD0, ARG1);
 
 }
 
@@ -962,8 +994,8 @@ void
 handle_syscall__listen(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
         dump_syscall(c, p, regs,
-                     "fd:%lld, backlog:%lld",
-                     ARG0, ARG1);
+                     "fd:%s, backlog:%lld",
+                     SAFD0, ARG1);
 }
 
 void
@@ -1071,10 +1103,10 @@ handle_syscall__mmap(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (ARG4 >= 0) {
         if (c.dumping(p, OP, ARG4))
             dump_syscall(c, p, regs,
-                         "addr:0x%llx, length:%lld, prot:%s, flags:%s, fd:%lld, offset:%lld",
+                         "addr:0x%llx, length:%lld, prot:%s, flags:%s, fd:%s, offset:%lld",
                          ARG0, ARG1,
                          prot_flags2string(ARG2).c_str(),
-                         map_flags2string(ARG3).c_str(), ARG4, ARG5);
+                         map_flags2string(ARG3).c_str(), SAFD4, ARG5);
     }
 }
 
@@ -1222,13 +1254,44 @@ handle_syscall__open_by_handle_at(Capio &c, Process &p, struct user_regs_struct 
 void
 handle_syscall__openat(Capio &c, Process &p, struct user_regs_struct &regs) {
     p.close_fd(RC);
-    if (c.dumping(p, OP, ARG0, RC))
-        dump_syscall(c, p, regs,
-                     "dfd:%lld, path:%s, flags:%s, mode:0%03llo",
-                     ARG0,
-                     read_proc_c_string_quoted(p.pid, ARG1).c_str(),
-                     o_flags2string(ARG2).c_str(),
-                     ARG3);
+    if (c.dumping(p, OP)) {
+	string base;
+	string path = (ARG1 ? read_proc_c_string(p.pid, ARG1) : "NULL");
+	string abspath = p.resolve_path(path, base);
+	bool base_is_valid = true;
+	if (AFD0 == AT_FDCWD) {
+	    base = get_process_cwd(p.pid);
+	    abspath = p.resolve_path(path, base);
+	}
+	else if (AFD0 < 0) {
+	    base_is_valid = false;
+	    base = "NULL";
+	    abspath = "NULL";
+	}
+	else {
+	    base = p.fd_path(ARG0);
+	    abspath = p.resolve_path(path, base);
+	}
+
+	if (p.dumping_fd(ARG0) ||
+	    p.dumping_fd(RC) ||
+	    c.dumping_path(base) ||
+	    (base_is_valid && (c.dumping_path(base) ||
+			       (ARG1 && c.dumping_path(abspath))))) {
+	    dump_syscall_wo_endl(c, p, regs,
+				 "dfd:%s, path:%s, flags:%s, mode:0%03llo",
+				 SAFD0,
+				 read_proc_c_string_quoted(p.pid, ARG1).c_str(),
+				 o_flags2string(ARG2).c_str(),
+				 ARG3);
+	    dual_ostream &out = c.out(p);
+	    out << "; at:";
+	    put_quoted(out, base);
+	    out << ", path:";
+	    put_quoted(out, (RC < 0 ? abspath : p.fd_path(RC)));
+	    out << endl;
+	}
+    }
 }
 
 void
@@ -1369,7 +1432,7 @@ handle_syscall__read(Capio &c, Process &p, struct user_regs_struct &regs) {
 void
 handle_syscall__readahead(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
-        dump_syscall(c, p, regs, "fd:%lld, offset:%lld, count:%lld", ARG0, ARG1, ARG2);
+        dump_syscall(c, p, regs, "fd:%s, offset:%lld, count:%lld", SAFD0, ARG1, ARG2);
 }
 
 void
@@ -1586,8 +1649,8 @@ void
 handle_syscall__sendfile(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
         dump_syscall(c, p, regs,
-                     "out_fd:%lld, in_fd:%lld, offset:%lld",
-                     ARG0, ARG1, ARG2);
+                     "out_fd:%s, in_fd:%s, offset:%lld",
+                     SAFD0, SAFD1, ARG2);
 }
 
 void
@@ -1749,8 +1812,8 @@ void
 handle_syscall__shutdown(Capio &c, Process &p, struct user_regs_struct &regs) {
     if (c.dumping(p, OP, ARG0))
         dump_syscall(c, p, regs,
-                     "fd:%lld, how:%s",
-                     ARG0,
+                     "fd:%s, how:%s",
+                     SAFD0,
                      shut_flags2string(ARG1).c_str());
 }
 

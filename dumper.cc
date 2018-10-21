@@ -139,7 +139,7 @@ dump_mem(dual_ostream &out, char format, bool writting, const unsigned char *dat
 }
 
 void
-dump_io(Capio &c, Process &p, struct user_regs_struct &regs, long long mem, size_t len) {
+dump_io(Capio &c, Process &p, struct user_regs_struct &regs, long long mem, ssize_t len) {
     dual_ostream &out = c.out(p);
     bool writting = syscalls[OP].writes();
     const unsigned char *data = read_proc_mem(p.pid, mem, len);
@@ -162,5 +162,3 @@ dump_iov(Capio &c, Process &p, struct user_regs_struct &regs, long long mem, lon
         remaining -= chunk;
     }
 }
-
-

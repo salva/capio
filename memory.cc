@@ -10,7 +10,7 @@ void fatal(const char *msg);
 using namespace std;
 
 void*
-get_buffer(size_t len) {
+get_buffer(ssize_t len) {
     static void *buffer = NULL;
     static size_t buffer_size = 0;
 
@@ -22,9 +22,9 @@ get_buffer(size_t len) {
 }
 
 const unsigned char *
-read_proc_mem(pid_t pid, long long mem, size_t len) {
+read_proc_mem(pid_t pid, long long mem, ssize_t len) {
     if (len > 0) {
-        size_t i, offset, len_long;
+        ssize_t i, offset, len_long;
         unsigned char *buffer;
 
         offset = mem & (sizeof(long) - 1);
@@ -42,7 +42,7 @@ read_proc_mem(pid_t pid, long long mem, size_t len) {
 }
 
 string
-read_proc_string_quoted(pid_t pid, long long mem, size_t len) {
+read_proc_string_quoted(pid_t pid, long long mem, ssize_t len) {
     stringstream ss;
     if (mem) {
         const unsigned char *data = read_proc_mem(pid, mem, len);
@@ -59,7 +59,7 @@ read_proc_ptr(pid_t pid, long long mem) {
 }
 
 string
-read_proc_c_string(pid_t pid, long long mem, size_t maxlen) {
+read_proc_c_string(pid_t pid, long long mem, ssize_t maxlen) {
     if (mem) {
         stringstream ss;
         int start = mem & (sizeof(long) - 1);
@@ -69,11 +69,12 @@ read_proc_c_string(pid_t pid, long long mem, size_t maxlen) {
                 long buffer_long;
             };
             buffer_long = ptrace(PTRACE_PEEKTEXT, pid, mem - start, NULL);
-            for (int i = start; maxlen-- && (i < sizeof(long)); i++) {
+            for (int i = start; --maxlen && (i < sizeof(long)); i++) {
                 if (buffer[i] == 0) break;
                 ss.put(buffer[i]);
             }
             start = 0;
+	    mem += sizeof(long);
         }
         return ss.str();
     }
@@ -81,12 +82,12 @@ read_proc_c_string(pid_t pid, long long mem, size_t maxlen) {
 }
 
 string
-read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen) {
+read_proc_c_string_quoted(pid_t pid, long long mem, ssize_t maxlen) {
     if (mem) {
         stringstream ss;
         ss << "\"";
         while (maxlen) {
-            size_t chunk = 256 - (mem & 255);
+            ssize_t chunk = 256 - (mem & 255);
             if (chunk > maxlen) chunk = maxlen;
             const unsigned char *data = read_proc_mem(pid, mem, chunk);
             int len = strnlen((const char*)data, chunk);
@@ -104,12 +105,12 @@ read_proc_c_string_quoted(pid_t pid, long long mem, size_t maxlen) {
 }
 
 
-size_t round_up_len(size_t len) {
+ssize_t round_up_len(ssize_t len) {
     return ((len + sizeof(long) - 1) & ~(sizeof(long) - 1));
 }
 
 string
-read_proc_sockaddr(pid_t pid, long long mem, size_t len) {
+read_proc_sockaddr(pid_t pid, long long mem, ssize_t len) {
     if (mem) {
         auto data = (struct sockaddr *)read_proc_mem(pid, mem, len);
         return sockaddr2string(data, len);
@@ -147,9 +148,9 @@ read_proc_off_t(pid_t pid, long long mem) {
 }
 
 string
-read_proc_size_t(pid_t pid, long long mem) {
+read_proc_ssize_t(pid_t pid, long long mem) {
     if (mem) {
-        auto data = (const size_t *)read_proc_mem(pid, mem, sizeof(size_t));
+        auto data = (const ssize_t *)read_proc_mem(pid, mem, sizeof(ssize_t));
         return to_string(*data);
     }
     return "NULL";
@@ -192,13 +193,13 @@ read_proc_array_c_string_quoted(pid_t pid, long long mem) {
 }
 
 void
-read_proc_struct(pid_t pid, long long mem, size_t len, void *to) {
+read_proc_struct(pid_t pid, long long mem, ssize_t len, void *to) {
     const unsigned char *data = read_proc_mem(pid, mem, len);
     memcpy(to, data, len);
 }
 
 string
-read_proc_array_int(pid_t pid, long long mem, size_t items) {
+read_proc_array_int(pid_t pid, long long mem, ssize_t items) {
     if (mem) {
         stringstream ss;
         ss << "[";
@@ -218,7 +219,7 @@ read_proc_sysctl_args(pid_t pid, long long mem) {
     if (mem) {
         struct __sysctl_args args;
         read_proc_struct(pid, mem, sizeof(args), &args);
-        size_t oldlen = 0;
+        ssize_t oldlen = 0;
         if (args.oldlenp)
             read_proc_struct(pid, mem, sizeof(oldlen), &oldlen);
 
